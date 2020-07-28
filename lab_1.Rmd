@@ -1,0 +1,316 @@
+---
+title: "week 1 lab 1"
+author: "Henry He"
+date: "2020/7/28"
+output: html_document
+---
+
+```{r}
+## For reproducibility 
+set.seed(09262019)
+```
+
+# The binomial distribution
+The binomial distribution **Bin(m,p)** is defined by the number of successes in m independent trials, each have probability p of success. Think of flipping a coin m times, where the coin is weighted to have probability p of landing on heads.
+The R function `rbinom()` generates random variables with a binomial distribution. E.g.,
+```{r}
+rbinom(n=20, size=10, prob=0.5)
+```
+produces 20 observations from **Bin(10,0.5)**.
+
+
+# Some simple manipulations
+
+ * 1a. Generate 300 random values from the **Bin(15,0.5)** distribution, and store them in a vector called `bin.draws.0.5`.Extract and display the first 25 elements. Extract and display all but the first 275 elements.
+```{r}
+bin.draws.0.5 <- rbinom(n = 300,size = 15, prob = 0.5)
+
+## first 25
+bin.draws.0.5[c(1:25)]
+## last 25
+bin.draws.0.5[c(276:300)]
+```
+ * 1b. Add the first element of bin.draws.0.5 to the sixth. Compare the second element to the fifth, which is larger? A bit more tricky: print the indices of the elements of bin.draws.0.5 that are equal to 3. How many such elements are there? Theoretically, how many such elements would you expect there to be? Hint: it would be helpful to look at the help file for the` rbinom()` function.
+```{r}
+# add first and sixth
+bin.draws.0.5[1] + bin.draws.0.5[6]
+# compare second and fifth
+bin.draws.0.5[2] < bin.draws.0.5[5]
+# indices that equals to 3
+indices <- which(bin.draws.0.5 == 3)
+indices
+#num of such elements
+length(indices)
+```
+ 
+ * 1c. Find the mean and standard deviation of `bin. draws.0.5` . Is the mean close what you’d expect? The standard deviation?
+```{r}
+#mean
+mean_0.5 <- mean(bin.draws.0.5)
+mean_0.5
+# standard deviation
+sd_0.5 <- sd(bin.draws.0.5)
+sd_0.5
+```
+* 1d. Call `summary()` on `bin.draws.0.5` and describe the result.
+
+```{r}
+summary(bin.draws.0.5)
+```
+* 1e. Find the data type of the elements in `bin.draws.0.5` using `typeof()`. Then convert bin.draws.0.5 to a vector of characters, storing the result as `bin.draws.0.5.char`, and use` typeof()` again to verify that you’ve done the conversion correctly. Call `summary()` on `bin.draws.0.5.char`. Is the result formatted differently from what you saw above? Why?
+```{r}
+# type 
+typeof(bin.draws.0.5)
+# convert to characters
+bin.draws.0.5.char <- as.character(bin.draws.0.5)
+# type
+typeof(bin.draws.0.5.char)
+# summary; It is different because now the elements are characters not integers
+summary(bin.draws.0.5.char)
+
+```
+# Some simple plots
+* 2a. The function `plot()` is a generic function in R for the visual display of data. The function `hist()` specifically produces a histogram display. Use `hist()` to produce a histogram of your random draws from the binomial distribution, stored in` bin.draws.0.5`.
+```{r}
+# histogram
+hist(bin.draws.0.5)
+```
+* 2b. Call `tabulate()` on `bin.draws.0.5`. What is being shown? Does it roughly match the histogram you produced in the last question?
+```{r}
+# it counts the number of times each integer occurs in it
+tabulate(bin.draws.0.5)
+```
+* 2c. Call `plot()` on bin.draws.0.5 to display your random values from the binomial distribution. Can you interpret what the `plot()` function is doing here?
+```{r}
+plot(bin.draws.0.5)
+```
+* 2d. Call `plot()` with two arguments, the first being 1:300, and the second being bin.draws.0.5. This creates a scatterplot of `bin.draws.0.5` (on the y-axis) versus the indices 1 through 300 (on the x-axis). Does this match your plot from the last question?
+```{r}
+# Same plot as 2c
+plot(1:300,bin.draws.0.5)
+```
+
+
+# More binomials, more plots
+
+* Generate 300 binomials again, composed of 15 trials each, but change the probability of success to: 0.2, 0.3, 0.4, 0.6, 0.7, and 0.8, storing the results in vectors called `bin.draws.0.2`, `bin.draws.0.3`, `bin.draws.0.4.`, `bin.draws.0.6`, `bin.draws.0.7` and  `bin.draws.0.8`. For each, compute the mean and standard deviation.
+```{r}
+# 0.2
+bin.draws.0.2 <- rbinom(n = 300,size = 15,prob = 0.2)
+
+mean_0.2 <- mean(bin.draws.0.2)
+
+sd_0.2 <- sd(bin.draws.0.2)
+
+#0.3
+
+bin.draws.0.3 <- rbinom(n = 300,size = 15,prob = 0.3)
+
+mean_0.3 <- mean(bin.draws.0.3)
+
+sd_0.3 <- sd(bin.draws.0.3)
+#0.4
+
+bin.draws.0.4 <- rbinom(n = 300,size = 15,prob = 0.4)
+
+mean_0.4 <- mean(bin.draws.0.4)
+
+sd_0.4 <- sd(bin.draws.0.4)
+
+#0.6
+
+bin.draws.0.6 <- rbinom(n = 300,size = 15,prob = 0.6)
+
+mean_0.6 <- mean(bin.draws.0.6)
+
+sd_0.6 <- sd(bin.draws.0.6)
+
+#0.7
+
+bin.draws.0.7 <- rbinom(n = 300,size = 15,prob = 0.7)
+
+mean_0.7 <-mean(bin.draws.0.7)
+
+sd_0.7 <- sd(bin.draws.0.7)
+
+#0.8
+
+bin.draws.0.8 <- rbinom(n = 300,size = 15,prob = 0.8)
+
+mean_0.8 <- mean(bin.draws.0.8)
+
+sd_0.8 <- sd(bin.draws.0.8)
+
+```
+
+* We'd like to compare the properties of our vectors. Create a vector of length 7, whose entries are the means of the 7 vectors we've created, in order according to the success probabilities of their underlying binomial distributions (0.2 through 0.8).
+```{r}
+
+means <- c(mean_0.2,mean_0.3,mean_0.4,mean_0.5,mean_0.6,mean_0.7,mean_0.8)
+```
+* 3c. Using the vectors from the last part, create the following scatterplots. Explain in words, for each, what's going on.
+    + The 7 means versus the 7 probabilities used to generate the draws.
+    + The standard deviations versus the probabilities.
+    + The standard deviations versus the means.
+    
+    **Challenge**: for each plot, add a curve that corresponds to the relationships you'd expect to see in the theoretical population (i.e., with an infinite amount of draws, rather than just 300 draws).
+```{r}
+prob <- c(0.2,0.3,0.4,0.5,0.6,0.7,0.8)
+# plot 1
+plot(prob, means)
+lines(prob,means)
+# list of standard deviations
+std <- c(sd_0.2,sd_0.3,sd_0.4,sd_0.5,sd_0.6,sd_0.7,sd_0.8)
+# plot 2
+plot(prob,std)
+lines(prob,std)
+# plot 3
+p3 <-plot(means,std) 
+lines(means,std)
+
+```
+  
+  # Working with matrices
+  * 4.a Create a matrix of dimension 300 x 7, called `bin.matrix`, whose columns contain the 7 vectors we've created, in order of the success probabilities of their underlying binomial distributions (0.2 through 0.8). Hint: use `cbind()`. 
+```{r}
+bin.matrix <- cbind(bin.draws.0.2)
+bin.matrix <- cbind(bin.matrix,bin.draws.0.3)
+bin.matrix<- cbind(bin.matrix,bin.draws.0.4)
+bin.matrix<- cbind(bin.matrix,bin.draws.0.5)
+bin.matrix<- cbind(bin.matrix,bin.draws.0.6)
+bin.matrix<- cbind(bin.matrix,bin.draws.0.7)
+bin.matrix<- cbind(bin.matrix,bin.draws.0.8)
+bin.matrix
+```
+
+ * 4.b Print the first five rows of `bin.matrix`. Print the element in the 66th row and 5th column. Compute the largest element in first column. Compute the largest element in all but the first column.
+```{r}
+bin.matrix[1:5,]
+bin.matrix[66,5]
+max(bin.matrix[,1])
+max(bin.matrix[,c(2:7)])
+
+```
+* **4.c** Calculate the column means of `bin.matrix` by using just a single function call.
+```{r}
+col_means <- colMeans(bin.matrix)
+col_means
+```
+
+* **4d.** Compare the means you computed in the last question to those you computed in Q3b, in two ways. First, using `==`, and second, using `identical()`. What do the two ways report? Are the results compatible? Explain.
+```{r}
+# first report if each entry is the same, while the second only return one boolean
+col_means == means
+identical(col_means,means)
+```
+* **4e.** Take the transpose of `bin.matrix` and then take row means. Are these the same as what you just computed? Should they be?
+```{r}
+T_matrix <- t(bin.matrix)
+# the same as above, as now cols are corresponding to the rows above
+rowMeans(T_matrix)
+```
+
+# Warm up is over, let's go big
+* **5a.** R's capacity for data storage and computation is very large compared to what was available 10 years ago. Generate 3 million numbers from $\mathrm{Bin}(1 \times 10^6, 0.5)$ distribution and store them in a vector called `big.bin.draws`. Calculate the mean and standard deviation of this vector.
+
+```{r}
+big.bin.draws <- rbinom(n = 3*10^6, size = 10^6, prob = 0.5)
+big.bin.mean <- mean(big.bin.draws)
+big.bin.sd <- sd(big.bin.draws)
+big.bin.mean
+big.bin.sd
+
+```
+* **5b.** Create a new vector, called `big.bin.draws.standardized`, which is given by taking `big.bin.draws`, subtracting off its mean, and then dividing by its standard deviation. Calculate the mean and standard deviation of `big.bin.draws.standardized`. (These should be 0 and 1, respectively, or very, very close to it; if not, you've made a mistake somewhere).
+```{r}
+big.bin.draws.standardized <- (big.bin.draws - big.bin.mean)/big.bin.sd
+big.bin.draws.standardized.mean <- mean(big.bin.draws.standardized)
+big.bin.draws.standardized.sd <- sd(big.bin.draws.standardized)
+big.bin.draws.standardized.mean
+big.bin.draws.standardized.sd
+```
+* **5c.** Plot a histogram of `big.bin.draws.standardized`. To increase the number of histogram bars, set the `breaks` argument in the `hist()` function (e.g., set `breaks=100`). What does the shape of this histogram appear to be? Is this surprising? What could explain this phenomenon? Hint: rhymes with "Mental Gimmick Serum" ...
+```{r}
+# this is the shape of distribution of standard normal because of CLT
+hist(big.bin.draws.standardized, breaks = 100)
+```
+
+* **5d.** Calculate the proportion of times that an element of `big.bin.draws.standardized` exceeds 1.644854. Is this close to 0.05?
+```{r}
+# very close to 0.05
+length(big.bin.draws.standardized[big.bin.draws.standardized > 1.644854])/length(big.bin.draws.standardized)
+```
+* **5e.** Either by simulation, or via a built-in R function, compute the probability that a standard normal random variable exceeds 1.644854. Is this close to 0.05? Hint: for either approach, it would be helpful to look at the help file for the `rnorm()` function.
+```{r}
+1- pnorm(1.644854, mean = 0, sd = 1)
+```
+# Now let’s go really big
+* **6a.** Let's push R's computational engine a little harder. Design an expression to generate 100 million numbers from $\mathrm{Bin}(10 \times 10^6, 50 \times 10^{-8})$, to be saved in a vector called `huge.bin.draws`, but do not evaluate this command yet. Then ask your lab partner to name three of Justin Bieber's songs and simultaneously evaluate your R command that defines `huge.bin.draws`. Which finished first, R or your partner?  (Note: your partner cannot really win this game. Even if he/she finishes first, he/she still loses.)
+
+```{r}
+huge.bin.draws <- rbinom(n = 10^8 , size = 10^7, prob = 50*10^(-8))
+```
+* **6b.** Calculate the mean and standard deviation of `huge.bin.draws`. Are they close to what you'd expect? (They should be very close.) Did did longer to compute these, or to generate `huge.bin.draws` in the first place?
+```{r}
+# much faster to compute this 
+huge.bin.mean <- mean(huge.bin.draws)
+huge.bin.mean
+huge.bin.sd <- sd(huge.bin.draws)
+huge.bin.sd
+```
+* **6c.** Calculate the median of `huge.bin.draws`. Did this median calculation take longer than the calculating the mean? Is this surprising?
+```{r}
+# it takes longer
+huge.bin.median <- median(huge.bin.draws)
+huge.bin.median
+```
+
+* **6d.** Calculate the exponential of the median of the logs of `huge.bin.draws`, in one line of code. Did this take longer than the median calculation applied to `huge.bin.draws` directly? Is this surprising?
+```{r}
+exp(median(log(huge.bin.draws)))
+```
+ * **6e.** Plot a histogram of of `huge.bin.draws`, again with a large setting of the `breaks` argument (e.g., `breaks=100`). Describe what you see; is this different from before, when we had 3 million draws? **Challenge**: Is this surprising? What distribution is this?
+```{r}
+# it is Poisson distribution now, as the prob decrease to a very small value 
+hist(huge.bin.draws,breaks = 100)
+```
+
+
+
+# Going big with lists
+* **7a.** Convert `big.bin.draws` into a list using `as.list()` and save the result as `big.bin.draws.list`. Check that you indeed have a list by calling `class()` on the result. Check also that your list has the right length, and that its 1159th element is equal to that of `big.bin.draws`.
+```{r}
+big.bin.draws.list <- as.list(big.bin.draws)
+class(big.bin.draws.list)
+length(big.bin.draws.list)
+big.bin.draws.list[1159] == big.bin.draws[1159]
+```
+* **7b.** Run the code below, to standardize the binomial draws in the list big.bin.draws.list. Note that lapply() applies the function supplied in the second argument to every element of the list supplied in the first argument, and then returns a list of the function outputs. (We’ll learn much more about the apply() family of functions later in the course.) Did this lapply() command take longer to evaluate than the code you wrote in Q5b? (It should have; otherwise your previous code could have been improved, so go back and improve it.) Why do you think this is the case?
+```{r}
+# for each entry in the matrix, the function standardize is called once, which takes more time
+big.bin.draws.mean = mean(big.bin.draws)
+big.bin.draws.sd = sd(big.bin.draws)
+standardize = function(x) {
+  return((x - big.bin.draws.mean) / big.bin.draws.sd)
+}
+big.bin.draws.list.standardized.slow = lapply(big.bin.draws.list, standardize)
+```
+
+*  **7c.** Run the code below, which again standardizes the binomial draws in the list big.bin.draws.list, using lapply(). Why is it so much slower than the code in the last question? Think about what is happening each time the function is called.
+```{r}
+# now not only the function standardize, but sd() and mean() are called each time, so it is very slow.
+big.bin.draws.mean = mean(big.bin.draws)
+big.bin.draws.sd = sd(big.bin.draws)
+standardize.slow = function(x) {
+  return((x - mean(big.bin.draws)) / sd(big.bin.draws))
+}
+big.bin.draws.list.standardized.slow = lapply(big.bin.draws.list, standardize.slow)
+
+```
+* **7d.** Lastly, let's look at memory useage. The command `object.size(x)` returns the number of bytes used to store the object `x` in your current R session. Find the number of bytes used to store `big.bin.draws` and `big.bin.draws.list`. How many megabytes (MB) is this, for each object? Which object requires more memory, and why do you think this is the case? Remind yourself: why are lists special compared to vectors, and is this property important for the current purpose (storing the binomial draws)?
+```{r}
+# list takes more memories , as list need two parameter key and values
+object.size(big.bin.draws)
+object.size(big.bin.draws.list)
+```
+
