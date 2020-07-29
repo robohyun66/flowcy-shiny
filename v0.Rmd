@@ -1,0 +1,75 @@
+---
+title: "Plots"
+author: "Henry He"
+date: "2020/7/30"
+output: html_document
+---
+```{r}
+library(chron)
+library(devtools)
+library(dplyr)
+library(tidyr)
+library(data.table)
+library(ggplot2)
+library(gganimate)
+library(lubridate)
+library(plotly)
+```
+
+#Load data 
+```{r}
+filedir = file.choose()
+res = readRDS(filedir)
+countslist <- res$countslist
+pie_table <- data.frame(res$pie)
+pie_table <- setDT(pie_table, keep.rownames = "Time")[]
+colnames(pie_table)<-c("Time","cluster_1","cluster_2","cluster_3","cluster_4","cluster_5","cluster_6","cluster_7","cluster_8","cluster_9","cluster_10")
+# pie 
+pie_table <-pie_table%>%
+  gather(var,val,-c(1))%>%
+  separate(var,c("type","cluster"))
+colnames(pie_table) <- c("Time","Type","Cluster","Prob")
+pie_table
+
+# ylist 
+ylist <- res$ylist
+y_table <- data.frame()
+rept <- c()
+for(i in ylist){
+  rept <- c(rept,dim(i)[1])
+  y_table <- rbind(y_table,data.frame(i))
+}
+time <- rep(x$Time,times = rept)
+y_table$time  <- time
+df <- c(matrix(unlist(countslist), ncol=1))
+df <- df/max(unlist(countslist))
+#df <- sqrt(df) *10
+y_table$countslist <- df
+pie_table[1,]
+rep(pie_table[1,],3)
+nrow(pie_table)
+repeat_time <- rep(rept,10)
+rep(row.names(pie_table),repeat_time)
+y_table <- y_table[1:50000,]
+pie_table$Time[[1]]
+
+```
+
+# Generate Plots 
+```{r}
+
+p1<-plot_ly(y_table, y= ~chl_small,x = ~diam_mid, frame = ~time, size = ~countslist,type = 'scatter', mode = 'markers',sizes = c(0,2000), opacity = 0.5,alpha = 0.3)
+p2<-plot_ly(y_table, y = ~pe, x = ~chl_small, frame = ~time, size = ~ countslist,type = 'scatter', mode = 'markers',alpha = 0.3, opacity=0.5,sizes = c(0,2000))
+p3<-plot_ly(y_table, x= ~pe,y = ~diam_mid, frame = ~time,size = ~ countslist,type = 'scatter', mode = 'markers',opacity=0.5,sizes = c(0,2000),alpha = 0.3)
+p <- subplot(p1,p2,p3)
+  
+prob <- highlight_key(pie_table,~Cluster)
+p4 <- plot_ly(prob)%>%
+  group_by(Cluster)%>%
+  add_lines( x = ~Time, y = ~Prob, color = ~Cluster)%>%
+  add_lines(x = pie_table$Time[[1]], y = pie_table$Prob)
+subplot(p,p4,titleX = TRUE,titleY = TRUE,nrows = 2)
+  
+
+```
+
