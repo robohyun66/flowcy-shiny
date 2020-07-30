@@ -1,0 +1,254 @@
+---
+title: "Week 1 lab 3"
+author: "Henry He"
+date: "2020/7/30"
+output: html_document
+---
+# States data set
+Below we construct a data frame, of 50 states x 10 variables. The first 8 variables are numeric and the last 2 are factors. The numeric variables here come from the built-in `state.x77` matrix, which records various demographic factors on 50 US states, measured in the 1970s. You can learn more about this state data set by typing `?state.x77` into your R console. 
+```{r}
+state.df = data.frame(state.x77, Region=state.region, Division=state.division)
+```
+
+# Basic data frame manipulations
+
+- **1a.** Add a column to `state.df`, containing the state abbreviations that are stored in the built-in vector `state.abb`. Name this column `Abbr`. You can do this in (at least) two ways: by using a call to `data.frame()`, or by directly defining `state.df$Abbr`. Display the first 3 rows and all 11 columns of the new `state.df`.
+```{r}
+state.df$Abbr <- state.abb
+state.df[1:3,]
+```
+
+
+- **1b.** Remove the `Region` column from `state.df`. You can do this in (at least) two ways: by using negative indexing, or by directly setting `state.df$Region` to be `NULL`. Display the first 3 rows and all 10 columns of `state.df`.
+```{r}
+state.df$Region <- NULL
+state.df[1:3,]
+```
+
+
+- **1c.** Add two columns to `state.df`, containing the x and y coordinates (longitude and latitude, respectively) of the center of the states, that are stored in the (existing) list `state.center`. Hint: take a look at this list in the console, to see what its elements are named. Name these two columns `Center.x` and `Center.y`. Display the first 3 rows and all 12 columns of `state.df`.
+```{r}
+# x 
+x <- c(state.center[[1]])
+state.df$Center.X <- x
+y <- c(state.center[[2]])
+state.df$Center.Y <- y
+state.df[1:3,]
+```
+
+
+- **1d.** Make a new data frame which contains only those states whose longitude is less than -100. Do this in two different ways: using manual indexing, and `subset`(). Check that they are equal to each other, using an appropriate function call.
+```{r}
+
+new_df_1 <- state.df[state.df$Center.X < -100,]
+
+
+new_df_2 <- subset(state.df , state.df$Center.X < -100)
+
+all.equal(new_df_1,new_df_2)
+
+
+
+
+
+
+```
+
+
+- **1e.** Make a new data frame which contains only the states whose longitude is less than -100, and whose murder rate is above 9%. Print this new data frame to the console. Among the states in this new data frame, which has the highest average life expectancy?
+```{r}
+state.df[(state.df$Center.X < -100)& state.df$Murder > 9,]
+
+state.df[which.max(state.df$Life.Exp),]
+```
+
+# Prostate cancer data set
+Let’s return to the prostate cancer data set that we looked in Week 2 (taken from the book The Elements of Statistical Learning). Below we read in a data frame of 97 men x 9 variables. You can remind yourself about what’s been measured by looking back at the lab/homework (or by visiting the URL linked above in your web browser, clicking on “Data” on the left-hand menu, and clicking “Info” under “Prostate”).
+
+```{r}
+pros.dat = 
+  read.table("http://www.stat.cmu.edu/~ryantibs/statcomp/data/pros.dat")
+```
+
+# Practice with the apply family
+- **2a.** Using `sapply()`, calculate the mean of each variable. Also, calculate the standard deviation of each variable. Each should require just one line of code. Display your results.
+```{r}
+sapply(pros.dat, FUN = mean)
+sapply(pros.dat,FUN = sd)
+```
+
+
+- **2b.** Let's plot each variable against SVI. Using `lapply()`, plot each column, excluding SVI, on the y-axis with SVI on the x-axis. This should require just one line of code. **Challenge**: label the y-axes in your plots appropriately. Your solution should still consist of just one line of code and use an apply function. Hint: for this part, consider using `mapply()`.
+```{r}
+pros.dat[colnames(pros.dat) != "svi"]
+lapply(pros.dat[colnames(pros.dat) != "svi"], function(y){
+  plot(y = y ,x = pros.dat$svi)
+} )
+```
+
+
+- **2c.** Now, use `lapply()` to perform t-tests for each variable in the data set, between SVI and non-SVI groups. To be precise, you will perform a t-test for each variable excluding the SVI variable itself. For convenience, we've defined a function `t.test.by.ind()` below, which takes a numeric variable `x`, and then an indicator variable `ind` (of 0s and 1s) that defines the groups. Run this function on the columns of `pros.dat`, excluding the SVI column itself, and save the result as `tests`. What kind of data structure is `tests`? Print it to the console.
+```{r}
+t.test.by.ind = function(x, ind) {
+  stopifnot(all(ind %in% c(0, 1)))
+  return(t.test(x[ind == 0], x[ind == 1]))
+}
+tests <- lapply(pros.dat[colnames(pros.dat) != "svi"],colnames(pros.dat) != "svi", FUN = t.test.by.ind)
+class(tests)
+```
+
+**2d.** Using `lapply()` again, extract the p-values from the `tests` object you created in the last question, with just a single line of code. Hint: first, take a look at the first element of `tests`, what kind of object is it, and how is the p-value stored? Second, run the command `"[["(pros.dat, "lcavol")` in your console---what does this do? Now use what you've learned to extract p-values from the `tests` object
+```{r}
+lapply(tests, function(x){x$p.value})
+```
+# Rio Olympics data set
+Now we're going to examine data from the 2016 Summer Olympics in Rio de Janeiro, taken from https://github.com/flother/rio2016 (itself put together by scraping the official Summer Olympics website for information about the athletes). Below we read in the data and store it as `rio`.
+
+```{r}
+#rio = read.csv("http://www.stat.cmu.edu/~ryantibs/statcomp/data/rio.csv")
+filedir = file.choose()
+rio = read.csv(filedir)
+```
+
+
+# More practice with data frames and apply
+- **3a.** What kind of object is rio? What are its dimensions and columns names of `rio`? What does each row represent? Is there any missing data?
+```{r}
+class(rio)
+dim(rio)
+colnames(rio)
+summary(rio)
+```
+
+
+- **3b.** Use `rio` to answer the following questions. How many athletes competed in the 2016 Summer Olympics? How many countries were represented? What were these countries, and how many athletes competed for each one? Which country brought the most athletes, and how many was this? Hint: for a factor variable `f`, you can use `table(f)` see how many elements in `f` are in each level of the factor.
+```{r}
+length(rio$name)
+t <- table(rio$nationality)
+length(table(rio$nationality))
+t[which(t == max(t))]
+```
+
+
+- **3c.** How many medals of each type---gold, silver, bronze---were awarded at this Olympics? Are they equal? Is this result surprising, and can you explain what you are seeing?
+```{r}
+sum(rio$bronze)
+sum(rio$silver)
+sum(rio$gold)
+
+
+```
+
+
+- **3d.** Create a column called `total` which adds the number of gold, silver, and bronze medals for each athlete, and add this column to `rio`. Which athlete had the most number of medals and how many was this? Gold medals? Silver medals? In the case of ties, here, display all the relevant athletes. 
+```{r}
+
+rio$total <- rio$gold + rio$silver + rio$bronze 
+rio[which(rio$total == max(rio$total)),c(2,13)]
+rio[which(rio$gold == max(rio$gold)),c(2,9)]
+rio[which(rio$silver == max(rio$silver)),c(2,10)]
+rio[which(rio$bronze == max(rio$bronze)),c(2,11)]
+```
+
+
+- **3e.** Using `tapply()`, calculate the total medal count for each country. Save the result as `total.by.nat`, and print it to the console. Which country had the most number of medals, and how many was this? How many countries had zero medals?
+```{r}
+
+total.by.nat <- tapply(rio$total,INDEX = rio$nationality,sum)
+total.by.nat
+length(total.by.nat[total.by.nat == 0])
+```
+
+
+- **3f.** Among the countries that had zero medals, which had the most athletes, and how many athletes was this? (Ouch!)
+```{r}
+t <- table(rio$nationality)
+t[total.by.nat == 0]
+m <- max(t[total.by.nat == 0])
+t[total.by.nat == 0][which(t[total.by.nat == 0] == m)]
+```
+# Young and old folks
+
+- **4a.** The variable `date_of_birth` contains strings of the date of birth of each athlete. Use the `substr()` function to extract the year of birth for each athlete, and then create a new numeric variable called `age`, equal to 2016 - (the year of birth). (Here we're ignoring days and months for simplicity.) Hint: to extract the first 4 characters of a string `str`, you can use `substr(str, 1, 4)`. As always, you can also look at the help file for `substr()` for more details.
+
+
+  Add the `age` variable to the `rio` data frame. variable  Who is the oldest athlete, and how old is he/she? Youngest athlete, and how old is he/she? In the case of ties, here, display all the relevant athletes. 
+```{r}
+age <- 2016 - as.numeric(substr(rio$date_of_birth,1,4))
+rio$age <- age
+rio[which(rio$age == max(rio$age)),c(2,14)]
+rio[which(rio$age == min(rio$age)),c(2,14)]
+
+```
+
+  
+
+- **4b.** Answer the same questions as in the last part, but now only among athletes who won a medal.
+```{r}
+medal <- rio[which(rio$gold > 0),]
+medal[which(medal$age == max(medal$age)),c(2,14)]
+medal[which(medal$age == min(medal$age)),c(2,14)]
+```
+
+
+- **4c.** Using a single call to `tapply()`, answer: how old are the youngest and oldest athletes, for each sport? 
+```{r}
+young <- tapply(rio$age,INDEX = rio$sport,min)
+young
+old <- tapply(rio$age,INDEX = rio$sport,max)
+old
+```
+
+- **4d.** You should see that your output from `tapply()` in the last part is a list, which is not particularly convenient. Convert this list into a matrix that has one row for each sport, and two columns that display the ages of the youngest and oldest athletes in that sport. The first 3 rows should look like this:
+```
+                  Youngest Oldest
+aquatics               14     41
+archery                17     44
+athletics              16     47
+```
+  You'll notice that we set the row names according to the sports, and we also set appropriate column names. Hint: `unlist()` will unravel all the values in a list; and `matrix()`, as you've seen before, can be used to create a matrix from a vector of values. After you've converted the results to a matrix, print it to the console (and make sure its first 3 rows match those displayed above).
+```{r}
+m <- as.matrix(unlist(young))
+m <- cbind(m,old)
+colnames(m) <- c("Yougest","Oldest")
+m
+```
+  
+# Sport by sport
+
+- **5a.** Create a new data frame called `sports`, which we'll populate with information about each sporting event at the Summer Olympics. Initially, define `sports` to contain a single variable called `sport` which contains the names of the sporting events in alphabetical order. Then, add a column called `n_participants` which contains the number of participants in each sport. Use one of the apply functions to determine the number of gold medals given out for each sport, and add this as a column called `n_gold`. Using your newly created `sports` data frame, calculate the ratio of the number of gold medals to participants for each sport. Which sport has the highest ratio? Which has the lowest?
+```{r}
+sports <- data.frame(table(rio$sport))
+colnames(sports) <- c("sports","n_participants")
+sum_gold = function(x){
+  sum(rio$gold[rio$sport == x])
+}
+sports$n_gold <- c(apply(sports[1],MARGIN = 1,sum_gold))
+sports$ratio <- sports$n_gold/sports$n_participants
+sports[which(sports$ratio == max(sports$ratio)),]
+sports[which(sports$ratio == min(sports$ratio)),]
+```
+
+
+- **5b.** Use one of the apply functions to compute the average weight of the participants in each sport, and add this as a column to `sports` called `ave_weight`. Important: there are missing weights in the data set coded as `NA`, but your column `ave_weight` should ignore these, i.e., it should be itself free of `NA` values. You will have to pass an additional argument to your apply call in order to achieve this. Hint: look at the help file for the `mean()` function; what argument can you set to ignore `NA` values? Once computed, display the average weights along with corresponding sport names, in decreasing order of average weight.
+```{r}
+avg_weight = function(x){
+    mean(rio$weight[rio$sport == x],na.rm = TRUE)
+}
+sports$avg_weight <- c(apply(sports[1],MARGIN = 1, avg_weight))
+sports
+```
+
+
+- **5c.** As in the last part, compute the average weight of atheletes in each sport, but now separately for men and women. You should therefore add two new columns, called `ave_weight_men` and `ave_weight_women`, to `sports`. Once computed, display the average weights along with corresponding sports, for men and women, each list sorted in decreasing order of average weight. Are the orderings roughly similar
+```{r}
+avg_weight_sex = function(x,s){
+    mean(rio$weight[rio$sport == x & rio$sex == s],na.rm = TRUE)
+}
+sports$avg_weight_men <- c(apply(sports[1],MARGIN = 1, FUN = avg_weight_sex,s = "male"))
+sports$avg_weight_women <- c(apply(sports[1],MARGIN = 1, FUN = avg_weight_sex,s = "female"))
+sports
+```
+
+
+
