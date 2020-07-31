@@ -1,0 +1,594 @@
+---
+title: "Learning plotly and linked animations"
+author: Sangwon Hyun
+date: Jul 23, 2020
+output:
+  html_document:
+    code_folding: show
+    toc: true
+    toc_float: true
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE, eval=TRUE, cache=TRUE,
+                      warning=FALSE, message=FALSE)
+## la('flowcy')
+figdir = "~/Dropbox/research/usc/flow-cytometry/figures"
+library(gridExtra)
+library(tidyverse)
+library(dplyr)
+```
+
+
+## Goal
+
+Learn about linked animations in R + plotly.
+
+## Main reference
+
+https://plotly-r.com/client-side-linking.html#linking-animated-views
+
+- "This section focuses on a particular approach to *linking views* known as
+graphical (database) queries using the R package plotly."
+
+- "With plotly, one can write R code to pose graphical queries that operate
+entirely client-side in a web browser (i.e., no special web server or callback
+to R is required)."
+
+- "In addition to teaching you how to pose queries with the `highlight_key()`
+function, this section shows you how to control how queries are triggered and
+visually rendered via the `highlight()` function."
+
+*(Emphasis and formatting mine).*
+
+## First example
+
+Take a data frame called `mtcars`.
+
+```{r}
+mtcars %>% head() %>% print()
+```
+
+The option `highlight_key(~cyl)` lets you hover to a data point, and highlight
+  the points with the same `cyl` values.
+
+Use `highlight()` to customize the various interactions e.g. hover, single
+  click, double click.
+
+In the background, `highlight(on="plotly_hover")` performs a SQL query of the
+  form: `SELECT * FROM mtcars WHERE cyl IN $SELECTION_VALUE`.
+
+```{r, echo=TRUE, eval=TRUE, fig.width=10, fig.height = 5}
+library(plotly)
+mtcars %>%
+  highlight_key(~cyl) %>%
+  plot_ly(
+    x = ~wt, y = ~mpg, text = ~cyl, mode = "markers+text", 
+    textposition = "top", hoverinfo = "x+y"
+  ) %>%
+  highlight(on = "plotly_hover", off = "plotly_doubleclick")
+```
+
+## More involved example
+
+Now, load the `txhousing` dataset, whose rows are *monthly median sales* of real estate in regions of Texa:
+```{r}
+data(txhousing, package = "ggplot2")
+txhousing %>% head() %>% print()
+```
+
+Now, we'll create an interactive map:
+
+First, declare `city` as the SQL 'query by' column. *THIS IS THE ONLY
+INTERACTIVE ELEMENT IN THIS EXAMPLE*.
+
+```{r}
+tx <- highlight_key(txhousing, ~city)
+```
+
+Then, initiate a plotly object called `base`, then pipe it through some `plotly` functions to add features.
+```{r}
+# initiate a plotly object
+base <- plot_ly(tx, color = I("black")) %>% group_by(city)
+base %>%
+  group_by(city) %>%
+  add_lines(x = ~date, y = ~median) -> time_series
+```
+
+## Widget for selecting certain rows of data
+
+Querying a city via direct manipulation is somewhat helpful for focusing on a
+particular time series, but it’s not so helpful for 
+- querying a city by name,
+- and/or comparing multiple cities at once. 
+
+As it turns out, plotly makes it easy to add a `selectize.js` powered dropdown
+widget for querying by name (aka indirect manipulation) by setting 
+`selectize =TRUE`.
+
+When it comes to comparing multiple cities, we want to be able to both 
+- retain previous selections (`persistent = TRUE`), as well as 
+- control the highlighting color (`dynamic = TRUE`).
+
+<!-- This videos explains how to use these features in -->
+<!-- Figure 16.3 to compare pricing across different cities. -->
+Try this out:
+
+```{r}
+time_series %>% 
+highlight(
+  on = "plotly_click", 
+  selectize = TRUE, 
+  dynamic = TRUE, 
+  persistent = TRUE
+) 
+```
+
+## Linking
+
+Now, (finally) we get to linking.
+
+One obvious thing from playing around with the above application is that not
+every city has complete pricing information (e.g., South Padre Island, San
+Marcos, etc).
+
+To learn more about what cities are missing information as well as how that
+missingness is structured, we aim to link 
+- a view of the raw time series 
+- to a dot-plot of the corresponding number of missing values per city.
+
+In addition to making it easy to see how cities rank in terms of missing house
+prices, it also provides a way to query the corresponding time series (i.e.,
+reveal the structure of those missing values) by brushing cities in the
+dot-plot.
+
+This general pattern of linking aggregated views of the data to more detailed
+views fits the famous and practical information visualization advice from
+Shneiderman (1996): “Overview first, zoom and filter, then details on demand”.
+
+```{r eval=TRUE}
+data(txhousing, package = "ggplot2")
+tx <- highlight_key(txhousing, ~city)
+base <- plot_ly(tx, color = I("black")) %>%
+  group_by(city)
+
+time_series <- base %>%
+  group_by(city) %>%
+  add_lines(x = ~date, y = ~median)
+
+
+dot_plot <- base %>%
+  summarise(miss = sum(is.na(median))) %>%
+  filter(miss > 0) %>%
+  add_markers(
+    x = ~miss, 
+    y = ~forcats::fct_reorder(city, miss), 
+    hoverinfo = "x+y") %>%
+  layout(
+    xaxis = list(title = "Number of months missing"),
+    yaxis = list(title = ""))  %>% 
+  highlight(on = "plotly_click", dynamic = TRUE, selectize = TRUE)
+
+
+dot_plot
+time_series
+
+subplot(dot_plot,
+        time_series,
+        widths = c(.2, .8), titleX = TRUE) %>%
+  layout(showlegend = FALSE) %>%
+  highlight(on = "plotly_selected", dynamic = TRUE, selectize = TRUE)
+```
+
+(I can't get these to link; this is maybe because the documentation does not
+specify what `time_series` is, so I'm just guessing.)
+
+Some takeaways
+- only one `highlight()`  is possible for each visualization.
+- `subplot(a,b)` links two plotly plots `a` and `b`. `layout()` is formatting
+  for the subplots.
+
+**Q**: I can't figure out what the background grey is doing.
+
+How does plotly know to highlight the time series when markers in the dot-plot
+are selected? The answer lies in what data values are embedded in the graphical
+markers via `highlight_key()`.
+
+What happens in the background? First imagine a linked database query being
+performed behind the scenes:
+
+![Figure 16.5](./pipeline.svg)
+
+When ‘South Padre Island’ is selected, it first filters the aggregated dot-plot
+data down to just that one row, then it filters down the raw time-series data
+down to every row with ‘South Padre Island’ as a city.
+
+**The drawing logic will then call `Plotly.addTrace()` with the newly filtered
+data** which adds a new **graphical layer** representing the selection, allowing
+us to have finely-tuned control over the visual encoding of the data query.
+
+
+The biggest advantage of drawing an entirely new **graphical layer** with the
+filtered data is that it becomes easy to leverage *statistical trace types* for
+producing summaries that are conditional on the query; here is another example
+of doing this with histograms:
+
+```{r}
+hist <- add_histogram(
+  base,
+  x = ~median, 
+  histnorm = "probability density"
+)
+
+subplot(time_series, hist, nrows = 2) %>%
+  layout(barmode = "overlay", showlegend = FALSE) %>%
+  highlight(
+    dynamic = TRUE, 
+    selectize = TRUE, 
+    selected = attrs_selected(opacity = 0.3)
+  )
+```
+
+## Highlight vs Filter
+
+A **highlight** event dims the opacity of existing marks, then adds an additional
+graphical layer representing the selection.
+
+A **filter** event completely remove existing marks and rescales axes to the
+remaining data.
+
+(Filtering uses the `crosstalk` R library.)
+
+```{r}
+library(crosstalk)
+
+# generally speaking, use a "unique" key for filter, 
+# especially when you have multiple filters!
+tx <- highlight_key(txhousing)
+
+gg <- ggplot(tx) + geom_line(aes(date, median, group = city))
+
+## 1. FILTER using filter_select() + bscols()
+filter <- bscols(
+  filter_select("id", "Select a city", tx, ~city), ## A DIRECT
+  ggplotly(gg, dynamicTicks = TRUE),
+  widths = c(12, 12)
+)
+filter
+
+## 2. HIGHLIGHT using highlight()
+tx2 <- highlight_key(txhousing, ~city, "Select a city")
+gg <- ggplot(tx2) + geom_line(aes(date, median, group = city))
+select <- highlight(
+  ggplotly(gg, tooltip = "city"), 
+  selectize = TRUE, persistent = TRUE
+)
+
+select
+```
+
+Some takeaways:
+
+- `bscols()` is for making side-by-side HTML elements. *This will be important*
+- The `highlight` functionality is from the plotly side; the `filter_select`
+  functionality heavily borrows from `crosstalk`.
+
+
+## Multiple widgets
+
+Show only a subset of years or cities, and also only show medians with `sales`
+in some range:
+
+```{r}
+library(crosstalk) 
+tx <- highlight_key(txhousing)
+widgets <- bscols(
+  widths = c(12, 12, 12),
+  filter_select("city", "Cities", tx, ~city),
+  filter_slider("sales", "Sales", tx, ~sales),
+  filter_checkbox("year", "Years", tx, ~year, inline = TRUE)
+)
+bscols(
+  widths = c(4, 8), widgets, 
+  plot_ly(tx, x = ~date, y = ~median, showlegend = FALSE) %>% 
+    add_lines(color = ~city, colors = "black")
+)
+```
+
+
+As Figure 16.9 demonstrates, filter and highlight events can work in conjunction
+with various htmlwidgets. In fact, since the semantics of filter are more
+well-defined than highlight, linking filter events across htmlwidgets via
+crosstalk should generally be more well-supported.
+
+```{r}
+eqs <- highlight_key(quakes)
+stations <- filter_slider(
+  "station", "Number of Stations", 
+  eqs, ~stations
+)
+
+p <- plot_ly(eqs, x = ~depth, y = ~mag) %>% 
+  add_markers(alpha = 0.5) %>% 
+  highlight("plotly_selected")
+
+library(leaflet)
+map <- leaflet(eqs) %>% 
+  addTiles() %>% 
+  addCircles()
+
+bscols(
+  widths = c(6, 6, 3), 
+  p, map, stations
+)
+```
+
+## Some thoughts
+
+I'm guessing we will have to make a choice (this is really a luxury) between the
+widget functionality that Shiny provides, and what we can do directly in
+conjunction with plotly. The last paragraph of chapter 16.5 says this:
+
+"**16.5 Limitations**
+
+The graphical querying framework presented here is for posing database queries
+between multiple graphs via direct manipulation. For serious statistical
+analysis, one often needs to link other data views (i.e., text-based summaries,
+tables, etc) in other arbitrary ways. For these use cases, the R package shiny
+makes it very easy to build on concepts we’ve already covered to build more
+powerful client-server applications entirely in R, without having to learn any
+HTML, CSS, or JavaScript. The next Chapter 17 gives a brief introduction to
+shiny, then dives right into concepts related to linking plotly graphics to
+other arbitrary views."
+
+So, it seems to me that both chapters 16 *and* 17 are requisite readings.
+
+## Finally, Animations
+
+"The graphical querying framework (Section 16.1) works in tandem with key-frame
+animations Section (14)."
+
+
+```{r}
+library(gapminder)
+gapminder %>% print()
+```
+
+The dataset contains rows equal to unique country-years. 
+
+The features are `continent`, `lifeExp`, `pop`, and `gdpPercap`.
+
+The following animation does a few things:
+- Draws a scatter plot over time `frame=year`, of `gdpPercap` and `lifeExp`.
+- Colors by continent `color=continent`.
+- Highlights the animation by continent `g <- highlight_key(gapminder,
+  ~continent)`.
+  + Hovering is enabled by `highlight(..., "plotly_hover")`.
+  + If you put an 
+- Adds a best-fit line `geom_smooth(method='lm')` between `gdpPercap` and
+  `lifeExp`.
+
+```{r}
+g <- highlight_key(gapminder, ~continent)
+gg <- ggplot(g, aes(gdpPercap, lifeExp, color = continent, frame = year)) +
+  geom_point(aes(size = pop, ids = country)) +
+  geom_smooth(se = FALSE, method = "lm") +
+  scale_x_log10()
+highlight(ggplotly(gg), "plotly_hover")
+```
+
+
+## Linked Animations
+
+(We first need to install an R package from github using `Rscript -e
+"devtools::install_github('cpsievert/plotly_book')"`.)
+
+Now, let's try to link two animations.
+
+```{r}
+## data(gap, package = "plotlyBook")
+load("./gap.rda") ## from https://github.com/cpsievert/plotly_book/blob/master/data/gap.rda
+gap %>% print()
+```
+
+The dataset is a table whose rows are country-years, and contains features such
+as life expectancy, gdp per capita, area and population density.
+
+
+The following animation does a few things:
+
+- Highlighting key is by country `gapKey <- highlight_key(gap, ~country)`.
+
+- Basically, these are two different representations of one data frame; each row
+  is one data point in both plots, but the x and y axes are different.
+  - **p1** Draws a scatterplot of country vs population density `plot_ly(gap, y
+    = ~country, x = ~popDen, hoverinfo = "x")`
+  - **p2** Draws a scatterplot between per capita gdp vs life expectancy, with points sized by  `popDen`.
+  
+- Animation is over years, since `frame=~year` in both **p1** and **p2**
+
+```{r}
+gapKey <- highlight_key(gap, ~country)
+
+p1 <- plot_ly(gap, y = ~country, x = ~popDen, hoverinfo = "x") %>%
+  add_markers(alpha = 0.1, color = I("black")) %>%
+  add_markers(
+    data = gapKey, 
+    frame = ~year, 
+    ids = ~country, 
+    color = I("red")
+  ) %>%
+  layout(xaxis = list(type = "log"))
+
+p2 <- plot_ly(gap, x = ~gdpPercap, y = ~lifeExp, size = ~popDen, 
+              text = ~country, hoverinfo = "text") %>%
+  add_markers(color = I("black"), alpha = 0.1) %>%
+  add_markers(
+    data = gapKey, 
+    frame = ~year, 
+    ids = ~country, 
+    color = I("red")
+  ) %>%
+  layout(xaxis = list(type = "log"))
+
+subplot(p1, p2, nrows = 1, widths = c(0.3, 0.7), titleX = TRUE) %>%
+  hide_legend() %>%
+  animation_opts(1000, redraw = FALSE) %>%
+  layout(hovermode = "y", margin = list(l = 100)) %>%
+  highlight(
+    "plotly_selected", 
+    color = "blue", 
+    opacityDim = 1, 
+    hoverinfo = "none"
+  )
+```
+
+## What's next?
+
+Next steps:
+
+- Try out the examples in 16.4 (in a similar fashion/rigor as above).
+- Go over chapter 17.
+- Read frame-wise animations Section (14).
+
+Some questions to answer (**SH:** Henry please follow up with me on these points.)
+
+- Can we link animations coming from more than one data frame? or do we need to
+  somehow make a giant data frame.
+- How to use these tools for visualizing our data?
+- How to use widgets with `subplots()`?
+- How to host in a Shiny app?
+- What can we use from native shiny, and what can we use from plotly
+  (i.e. building widgets entirely using plotly).
+
+
+## An example using our data
+
+Load our data.
+
+```{r}
+filedir = "./res.RDS"
+res = readRDS(filedir)
+```
+
+Make some scatterplots:
+
+```{r, fig.width=20, fig.height=7}
+## Summarize the ylist by collapsing the counts into two dimensions
+devtools::load_all('~/repos/flowcy/flowcy')
+
+## Use the functionality in the "flowcy" R package.
+par(mfrow = c(1, 3))
+tt = 50
+library(dplyr)
+for(dims in list(c(1,2), c(2,3), c(3,1))){
+  one_dim_scatterplot(res$ylist, obj=NULL, tt=tt,
+                      countslist = res$countslist, cex_fac=20,
+                      dims = dims)
+}
+```
+
+Now, make an animation:
+```{r}
+times = 200:296
+fac = 2
+
+## First pair of dimensions
+dims = c(1:2)
+ylist_summary <- Map(collapse_3d_to_2d, res$ylist, res$countslist,
+                     dims = rep(list(dims), length(res$ylist)))[times]
+ylist_summary <- lapply(ylist_summary, as_tibble)
+ylist_summary <- Map(function(dat, nm){cbind(dat, time=nm)},
+                     ylist_summary, names(ylist_summary))
+ymat = do.call(rbind, ylist_summary)
+ymat$counts = ymat$counts/max(ymat$counts) %>% sqrt() * fac
+p1 = plot_ly(ymat, x= ~diam_mid,y = ~chl_small,
+             marker = list(size = ~counts, opacity=0.3),
+             frame = ~time,
+             col="blue")
+## p1 %>% animation_opts(50, redraw = FALSE)
+
+
+## Second pair of dimensions
+dims = c(2:3)
+ylist_summary <- Map(collapse_3d_to_2d, res$ylist, res$countslist,
+                     dims = rep(list(dims), length(res$ylist)))[times]
+ylist_summary <- lapply(ylist_summary, as_tibble)
+ylist_summary <- Map(function(dat, nm){cbind(dat, time=nm)},
+                     ylist_summary, names(ylist_summary))
+ymat = do.call(rbind, ylist_summary)
+ymat$counts = ymat$counts/max(ymat$counts) %>% sqrt() * fac
+p2 = plot_ly(ymat, x= ~chl_small,y = ~pe,
+             marker = list(size = ~counts, opacity=0.3),
+             frame = ~time,
+             col="blue")
+
+## Third pair of dimensions
+dims = c(3,1)
+ylist_summary <- Map(collapse_3d_to_2d, res$ylist, res$countslist,
+                     dims = rep(list(dims), length(res$ylist)))[times]
+ylist_summary <- lapply(ylist_summary, as_tibble)
+ylist_summary <- Map(function(dat, nm){cbind(dat, time=nm)},
+                     ylist_summary, names(ylist_summary))
+ymat = do.call(rbind, ylist_summary)
+ymat$counts = ymat$counts/max(ymat$counts) %>% sqrt() * fac
+p3 = plot_ly(ymat, x= ~pe,y = ~diam_mid,
+             marker = list(size = ~counts, opacity=0.3),
+             frame = ~time,
+             col="blue")
+
+subplot(p1, p2, p3) %>% animation_opts(50, redraw = FALSE) %>% layout(width=1500, height=500)
+```
+
+Also plot the covariates:
+```{r}
+X = res$X
+X = cbind(time=rownames(X),X)
+db = X[,] %>% as_tibble() %>% reshape2::melt(id.vars=c("time")) 
+## '%ni%' <- Negate('%in%')
+## db$variable %ni% c("par","sst", "sss", "nitrate_WOA_clim")
+colors = rep("grey", ncol(X)-1)
+colors[colnames(X) %in% c("par","sst", "sss", "nitrate_WOA_clim")] = RColorBrewer::brewer.pal(4, "Set3")
+width = rep(1, ncol(X))
+width[colnames(X) %in% c("par","sst", "sss", "nitrate_WOA_clim")] = 10
+p4 = db %>% plot_ly(color = ~variable, x = ~time, y = ~value,
+                    colors = colors, width=2000, height=400
+                    ## line = list(width = width),
+                    ) %>% add_lines()
+p4
+```
+
+## What's next? 
+
+(**SH:** Henry please follow up with me on these points.)
+
+- Link *three* of these scatterplots (`p1`, `p2`, and `p3`, and a covariate plot`p4`).
+- The three axes are all different; fix them over time.
+- The point sizes are weird; make sure the plotly point sizes are consistent
+  with the original plots.
+- Make it a joint animation.
+- Code blocks creating `p1`, `p2`, and `p3` are messy; clean up and remove
+  redundancy.
+- Add means (red dots) and probabilities (red dot sizes).
+- Add ellipses (lower priority for now).
+- For the covariate plot in `p4`, put the grey covariates in the background, and
+  bring the colored covariates (par, sss, sst, nitrate) to the front.
+- Interactivity: when a mouse click or hover occurs over one of the red dots;
+  the red means in *all three plots* corresponding to that cluster (e.g. cluster
+  number 3) should be highlighted.
+- Do we want to use `ggplotly()` or `plot_ly()`? Reading
+  https://plotly-r.com/animating-views.html could be helpful.
+- In `p4`, add vertical line that moves as a slider moves.
+- Slider should just have a few ticks.
+- The animation might be faster if we made it depend the same single data frame?
+  (This is just a hunch; it seems that animations might be produced by issuing
+  separte SQL queries to data matrices, every time the slider value
+  changes. This can be slow).
+- Smoother animation of scatter plots?
+- Any other suggestions?
+- (Longer term) All of this code should be organized as modular functions and
+  the code and functions should all be well documented.
+- Generally speaking, pro-actively do reading and document (i.e. take notes of)
+  what you've learned!
+- Find out how to host this in a Shiny app.
+- After we fully figure out how to the 3 scatter plots + 1 covariate plot *and*
+  how to host it, we should add covariate tables via hovering.

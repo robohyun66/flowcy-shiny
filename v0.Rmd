@@ -18,7 +18,8 @@ library(plotly)
 
 #Load data 
 ```{r}
-filedir = file.choose()
+filedir = "~/Downloads/for-henry/res.RDS"## file.choose()
+## filedir = "./res.RDS"## file.choose()
 res = readRDS(filedir)
 countslist <- res$countslist
 pie_table <- data.frame(res$pie)
@@ -31,27 +32,63 @@ pie_table <-pie_table%>%
 colnames(pie_table) <- c("Time","Type","Cluster","Prob")
 pie_table
 
-# ylist 
+# Henry's first version 
 ylist <- res$ylist
-y_table <- data.frame()
-rept <- c()
+microbenchmark::microbenchmark({
+  print(Sys.time())
+  y_table2 <- data.frame()
+  rept2 <- c()
+  for(i in ylist){
+    rept2 <- c(rept2, nrow(i))
+    y_table2 <- rbind(y_table2,data.frame(i)) ## inefficient
+  }
+},times=3)
+
+## SH: better than above
+y_table2 <- matrix(NA, nrow=sum(sapply(ylist, nrow)), ncol= ncol(ylist[[1]]))
+irow0 = 0
 for(i in ylist){
-  rept <- c(rept,dim(i)[1])
-  y_table <- rbind(y_table,data.frame(i))
+  irow0 = max(irow0) + 1:(nrow(i))
+  y_table2[irow0,] = i ## inefficient
 }
-time <- rep(x$Time,times = rept)
+y_table2 <- as.data.frame(y_table2)
+
+## SH: Better (=cleaner, readable, faster) code for the above.
+ylist <- res$ylist
+microbenchmark::microbenchmark({
+  y_table = do.call(rbind, ylist) %>% as.data.frame()
+}, times=10)
+stopifnot(all.equal(y_table, y_table2)) 
+stopifnot(all.equal(y_table, y_table2)) 
+rept = sapply(ylist, nrow)
+stopifnot(all(rept == rept2)) 
+
+
+## SH: I brought this over from your older script
+x <- data.frame(res$pie)
+x <- setDT(x, keep.rownames = "Time")[]
+
+time <- rep(x$Time,times = rept) ## SH: what is x$Time?  The rest of the code
+                                 ## doesn't run because of this!
 y_table$time  <- time
 df <- c(matrix(unlist(countslist), ncol=1))
 df <- df/max(unlist(countslist))
 #df <- sqrt(df) *10
 y_table$countslist <- df
-pie_table[1,]
-rep(pie_table[1,],3)
-nrow(pie_table)
-repeat_time <- rep(rept,10)
-rep(row.names(pie_table),repeat_time)
+
+
+
+## pie_table[1,]
+## rep(pie_table[1,],3)
+## nrow(pie_table)
+
+## repeat_time <- rep(rept,10)
+
+## rep(row.names(pie_table),repeat_time)
+
 y_table <- y_table[1:50000,]
-pie_table$Time[[1]]
+
+## pie_table$Time[[1]]
 
 ```
 
@@ -62,14 +99,26 @@ p1<-plot_ly(y_table, y= ~chl_small,x = ~diam_mid, frame = ~time, size = ~countsl
 p2<-plot_ly(y_table, y = ~pe, x = ~chl_small, frame = ~time, size = ~ countslist,type = 'scatter', mode = 'markers',alpha = 0.3, opacity=0.5,sizes = c(0,2000))
 p3<-plot_ly(y_table, x= ~pe,y = ~diam_mid, frame = ~time,size = ~ countslist,type = 'scatter', mode = 'markers',opacity=0.5,sizes = c(0,2000),alpha = 0.3)
 p <- subplot(p1,p2,p3)
+p
   
-prob <- highlight_key(pie_table,~Cluster)
-p4 <- plot_ly(prob)%>%
-  group_by(Cluster)%>%
-  add_lines( x = ~Time, y = ~Prob, color = ~Cluster)%>%
-  add_lines(x = pie_table$Time[[1]], y = pie_table$Prob)
-subplot(p,p4,titleX = TRUE,titleY = TRUE,nrows = 2)
-  
+## SH: first try at making time series plot sync with scatterplots
+colnames(pie_table)[1] = "Time"
+times = pie_table %>% select(Time) %>% unlist() %>% unique()
+pie_table_large_list <- lapply(times[1:11], function(mytime){
+  return(cbind(time = mytime, pie_table))
+})
+pie_table_large <- do.call(rbind, pie_table_large_list)
+pie_table_large %>% dim()
+pie_table_large %>% object.size() %>% format("Mb")
 
+prob <- highlight_key(pie_table_large, ~Cluster)
+p4 <- plot_ly(prob, frame = ~time) %>%
+  group_by(Cluster) %>%
+  add_lines(x = ~Time, y = ~Prob, color = ~Cluster)
+p4
+pie_table_large %>% select(time) %>% unique()
+y_table %>% select(time) %>% unique()
+subplot(p, p4,
+        titleX = TRUE, titleY = TRUE, nrows = 2)
 ```
 
