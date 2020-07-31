@@ -1,6 +1,5 @@
 #+Title: Justin trying chapter 16
 
-* Summary
-
-~learning-plotly.Rmd~ contains the code. Focus on the sections named *"What's
-next?"* for specific tasks moving forward.
+** Summary
+- ~learning-plotly.Rmd~ contains the code. 
+- Focus on the sections named *"What's next?"* for specific tasks moving forward.
