@@ -105,9 +105,9 @@ lapply(tests, function(x){x$p.value})
 Now we're going to examine data from the 2016 Summer Olympics in Rio de Janeiro, taken from https://github.com/flother/rio2016 (itself put together by scraping the official Summer Olympics website for information about the athletes). Below we read in the data and store it as `rio`.
 
 ```{r}
-#rio = read.csv("http://www.stat.cmu.edu/~ryantibs/statcomp/data/rio.csv")
-filedir = file.choose()
-rio = read.csv(filedir)
+rio = read.csv("http://www.stat.cmu.edu/~ryantibs/statcomp/data/rio.csv")
+## filedir = file.choose()
+## rio = read.csv(filedir)
 ```
 
 
