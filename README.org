@@ -6,7 +6,12 @@ an estimated sparse mixture of regression model, applied to continuous-time flow
 cytometry data collected from the ocean.
 
 * File structure
-Fill in here.
+
+[[./viz.R][viz.R]] contains the main helper functions.
+
+[[./demo.Rmd][demo.Rmd]] contains the main demo file for the viz application.
+
 
 * References
-[[.][Insert preprint here]]
+
+[[https://arxiv.org/abs/2008.11251]]

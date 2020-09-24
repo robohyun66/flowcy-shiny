@@ -1,0 +1,326 @@
+---
+title: "project"
+author: "Henry He"
+date: "2020/8/13"
+output: html_document
+---
+
+```{r}
+library(chron)
+library(devtools)
+library(dplyr)
+library(tidyr)
+library(data.table)
+library(ggplot2)
+library(gganimate)
+library(lubridate)
+library(plotly)
+```
+
+# Load Data
+The file res.RDS will be loaded into a list called `res`
+```{r}
+filedir = "C:/Users/Administrator/Documents/GitHub/flowcy-shiny/learning-plotly/res.RDS"
+res = readRDS(filedir)
+```
+
+# Read data
+Elements from `res` will stored into dataframes
+
+- countslist
+```{r}
+countslist <- res$countslist
+```
+- pie
+```{r}
+# read in data from `pie`
+pie_table <- data.frame(res$pie)
+
+# Make 'Time' a column
+pie_table <- setDT(pie_table, keep.rownames = "Time")[]
+
+# set colnames
+colnames(pie_table)<-c("Time","cluster_1","cluster_2","cluster_3","cluster_4","cluster_5","cluster_6","cluster_7","cluster_8","cluster_9","cluster_10")
+
+# Reshape pie_table into a dataframe with 3 columns：
+# Time : time corresponding to this row
+# Cluster : Which cluster is it; an integer from 1 to 10
+# Prob : the probability of this cluster at this time
+pie_table <-pie_table%>%
+  gather(var,val,-c(1))%>%
+  separate(var,c("type","cluster"))%>%
+  .[-2]
+colnames(pie_table) <- c("Time","Cluster","Prob")
+head(pie_table,10)
+tail(pie_table,10)
+```
+
+-Time
+```{r}
+# 296 time slots 
+Time <- unique(pie_table$Time)
+```
+
+- ylist 
+```{r}
+# read in ylist
+ylist <- res$ylist
+
+y_table = do.call(rbind, ylist) %>% as.data.frame()
+
+# Add `time` column
+time <- c()
+for(i in ylist){
+  time <- c(time,nrow(i))
+}
+time_column <- rep(Time,time)
+y_table$Time <- time_column
+head(y_table)
+```
+
+- ylist will be stored into 3 dataframe
+```{r}
+# new table 
+ylist = res$ylist
+countslists = res$countslist
+TT <- unique(y_table$time)
+
+#three tables to use 
+# each contains 2 of 3 dimensions with repeated points deleted
+diam_mid_chl_small_table <- data.frame()
+pe_chl_small_table <- data.frame()
+diam_mid_pe_table = data.frame()
+
+
+
+for (tt in Time){
+  dims = c(1,2)
+   ## Extract data
+  y = ylist[[tt]][,dims]
+
+
+  ## Temporary
+  y = ylist[[tt]][,dims]
+  cnames = colnames(y)
+  counts = countslist[[tt]]
+  yy = cbind(y, counts)
+  yy = yy %>% tibble::as_tibble() %>%
+    ## group_by(diam_mid, chl_small) %>%
+    dplyr::group_by_at(c(1,2)) %>%
+    dplyr::summarise(counts = sum(counts)) %>% as.matrix
+  counts = yy[,3]
+  y = yy[,1:3]
+  times <- rep(tt,nrow(y))
+  y = cbind(y, times)
+  y = as.data.frame(y)
+  y$diam_mid = as.numeric(y$diam_mid)
+  y$chl_small = as.numeric(y$chl_small)
+  y$counts = as.numeric(y$counts)
+  diam_mid_chl_small_table <- rbind(diam_mid_chl_small_table,y)
+  
+  
+  dims = c(2,3)
+   ## Temporary
+  y = ylist[[tt]][,dims]
+  conames = colnames(y)
+  yy = cbind(y, counts)
+  yy = yy %>% tibble::as_tibble() %>%
+    ## group_by(diam_mid, chl_small) %>%
+    dplyr::group_by_at(c(1,2)) %>%
+    dplyr::summarise(counts = sum(counts)) %>% as.matrix
+  y = yy[,1:3]
+  times <- rep(tt,nrow(y))
+  y = cbind(y, times)
+  y = as.data.frame(y)
+  y$pe = as.numeric(y$pe)
+  y$chl_small = as.numeric(y$chl_small)
+  y$counts = as.numeric(y$counts)
+  pe_chl_small_table <- rbind(pe_chl_small_table,y)
+  
+  dims = c(1,3)
+  ## Temporary
+  y = ylist[[tt]][,dims]
+  cnames = colnames(y)
+  counts = countslist[[tt]]
+  yy = cbind(y, counts)
+  yy = yy %>% tibble::as_tibble() %>%
+    ## group_by(diam_mid, chl_small) %>%
+    dplyr::group_by_at(c(1,2)) %>%
+    dplyr::summarise(counts = sum(counts)) %>% as.matrix
+  y = yy[,1:3]
+  times <- rep(tt,nrow(y))
+  y = cbind(y, times)
+  y = as.data.frame(y)
+  y$pe = as.numeric(y$pe)
+  y$diam_mid = as.numeric(y$diam_mid)
+  y$counts = as.numeric(y$counts)
+  diam_mid_pe_table <- rbind(diam_mid_pe_table,y)
+  
+}
+
+
+head(diam_mid_chl_small_table,10)
+colnames(diam_mid_chl_small_table) = c("diam_mid_chl_small","chl_small_diam_mid","counts_1","times")
+colnames(pe_chl_small_table) = c("chl_small_pe","pe_chl_small","counts_2","times")
+head(pe_chl_small_table,10)
+colnames(diam_mid_pe_table) = c("diam_mid_pe","pe_diam_mid","counts_3","times")
+head(diam_mid_pe_table,10)
+
+```
+- mn
+```{r}
+library(abind)
+# adding centers to the pie_table
+mn <- (res$mn)
+mn_table <- matrix(NA,nrow = 296*10, ncol = 5)
+for(i in 1:10){
+  begin = (i-1)*296 + 1
+  end = begin + 295
+  mn_table[begin:end,1:3] = mn[,,i]
+  mn_table[begin:end,4] = Time
+  mn_table[begin:end,5] = rep(i, 296)
+}
+mn_table <- data.frame(mn_table)
+colnames(mn_table) <- c("diam_mid_pie","chl_small_pie","pe_pie","Time","Cluster")
+for(i in 1:3){
+  mn_table[,i] = as.numeric(mn_table[,i])
+}
+mn_table
+pie_table <- cbind(mn_table,pie_table)[-5]
+pie_table
+dim(diam_mid_chl_small_table)
+dim(diam_mid_pe_table)
+dim(pe_chl_small_table)
+dim(pie_table)
+pie_table = pie_table[-5]
+```
+
+
+# Combine the data frames
+```{r}
+# Empty dataframe and then use cbind
+
+# Adding rows to each df so that they have same number of rows
+pie_table
+# max number of rows
+nrows = max(nrow(diam_mid_chl_small_table),nrow(diam_mid_pe_table),nrow(pe_chl_small_table),nrow(pie_table))
+
+# Add rows;
+fill_matrix = matrix(NA, nrow = (nrows - nrow(diam_mid_chl_small_table)) , ncol = ncol(diam_mid_chl_small_table))
+colnames(fill_matrix) = colnames(diam_mid_chl_small_table)
+diam_mid_chl_small_table = rbind(diam_mid_chl_small_table,data.frame(fill_matrix))
+
+
+fill_matrix = matrix(NA, nrow = (nrows - nrow(diam_mid_pe_table)) , ncol = ncol(diam_mid_pe_table) )
+colnames(fill_matrix) = colnames(diam_mid_pe_table)
+diam_mid_pe_table = rbind(diam_mid_pe_table,data.frame(fill_matrix))
+
+
+
+fill_matrix = matrix(NA, nrow = (nrows - nrow(pe_chl_small_table)), ncol = ncol(pe_chl_small_table))
+colnames(fill_matrix) = colnames(pe_chl_small_table)
+pe_chl_small_table = rbind(pe_chl_small_table,data.frame(fill_matrix))
+
+fill_matrix = matrix(NA, nrow = (nrows - nrow(pie_table)) , ncol = ncol(pie_table))
+colnames(fill_matrix) = colnames(pie_table)
+pie_table = rbind(pie_table,data.frame(fill_matrix))
+
+# combine rows
+df = cbind(diam_mid_chl_small_table,diam_mid_pe_table,pe_chl_small_table,pie_table)
+head(df)
+
+
+
+
+
+```
+
+# Animation of three scatterplots(single dataframe)
+-  easier to handle using plot_ly() and highlight_key()
+
+```{r}
+# To have a quickier view
+# df = df[1:500,]
+
+# generate three plots
+p1 <-plot_ly(df, x= ~diam_mid_chl_small,y = ~chl_small_diam_mid, size = ~counts_1,type = 'scatter', mode = 'markers',sizes = c(0,1000), opacity = 0.5,alpha = 0.3,showlegend = FALSE)%>%
+  add_trace(x = ~diam_mid_pie,y = ~chl_small_pie,frame = ~Time,
+            sizes = c(0,500),
+            hoverinfo = 'text',
+            text = ~paste("Cluster",Cluster),
+            hovertext = ~paste("Cluster",Cluster),
+            textposition = "bottom center",
+            mode = 'markers+text')
+
+p2<-plot_ly(df, y = ~pe_chl_small, x = ~chl_small_pe, size = ~ counts_2,type = 'scatter', mode = 'markers',alpha = 0.3, opacity=0.5,sizes = c(0,1000),showlegend = FALSE)%>%
+  add_trace(x = ~chl_small_pie, y = ~pe_pie,frame = ~Time,showlegend = FALSE,
+            sizes = c(0,500),
+            hoverinfo = 'text',
+            text = ~paste("Cluster",Cluster),
+            hovertext = ~paste("Cluster",Cluster),
+            textposition = "bottom center",
+            mode = 'markers+text')
+
+
+p3<-plot_ly(df, x= ~pe_diam_mid,y = ~diam_mid_pe,size = ~ counts_3,type = 'scatter', mode = 'markers',opacity=0.5,sizes = c(0,1000),alpha = 0.3, showlegend = FALSE)%>%
+  add_trace(x = ~pe_pie, y = ~diam_mid_pie,frame = ~Time,
+            sizes = c(0,500),
+            hoverinfo = 'text',
+            text = ~paste("Cluster",Cluster),
+            hovertext = ~paste("Cluster",Cluster),
+            textposition = "bottom center",
+            mode = 'markers+text'
+            )
+p <- subplot(p1,p2,p3)
+p
+
+
+
+
+# Todo:
+# choose text size 
+# Choose range of the sizes or possibly alter the counts to make the size of points looks better.
+# centers may have different lookings from other points
+# add ellipses
+```
+
+# Animation of the covariates table 
+```{r}
+
+
+
+# create highlight key
+prob_table <- highlight_key(df,~Cluster)
+pie_plot <- plot_ly(prob_table)%>%
+  group_by(Cluster)%>%
+  add_lines(x = ~Time , y = ~Prob, color = ~Cluster)%>%
+  add_segments(x = ~Time, xend = ~Time, y = 0, yend = 1, frame = ~Time,showlegend = FALSE, color = "red")
+
+# modify the x-axis  
+pie_plot <- pie_plot%>%layout(
+  xaxis = list(
+    type = "date",
+    tickformat = "%d%M%Y")
+)
+pie_plot
+
+# Todo:
+# the default number of colors is 8; need to pick 10 colors for the clusters
+# fix the x-axis issue
+# legends not in increasing order
+```
+
+
+Combine two plots
+```{r}
+plot <- subplot(p,pie_plot,nrows = 2)
+plot
+
+#Todo
+# Adding highlight interactivity to plot(including hover, click)
+# Change the formating of x axis 
+# show table by click
+# other formatting and style issues to makes it looks better.
+
+```
+
