@@ -5,7 +5,9 @@ date: "2020/9/17"
 output: html_document
 ---
 ```{r global_options, include=FALSE}
-knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE, eval=TRUE, cache=TRUE,
+knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE,
+                      eval=FALSE,  ## Set to FALSE because this script doesn't run
+                      cache=TRUE,
                       warning=FALSE, message=FALSE)
 library(chron)
 library(devtools)
@@ -17,7 +19,9 @@ library(gganimate)
 library(lubridate)
 library(plotly)
 library(abind)
-load_all('C:/Users/Administrator/Desktop/flowmix-master/flowmix') ## Replace with the location of on
+## load_all('C:/Users/Administrator/Desktop/flowmix-master/flowmix') ## Replace with the location of on
+##                                               ## your computer
+load_all('/home/shyun/repos/flowmix/flowmix') ## Replace with the location of on
                                               ## your computer
 ```
 
@@ -25,7 +29,8 @@ load_all('C:/Users/Administrator/Desktop/flowmix-master/flowmix') ## Replace wit
 The file res.RDS will be loaded into a `list` called `res`
 Entries of the list will then be extracted and seperately stored
 ```{r}
-filedir = "C:/Users/Administrator/Documents/GitHub/flowcy-shiny/learning-plotly/res.RDS"
+filedir = "~/Downloads/for-henry/res.RDS"
+## filedir = "C:/Users/Administrator/Documents/GitHub/flowcy-shiny/learning-plotly/res.RDS"
 res = readRDS(filedir)
 
 countslist = res$countslist
@@ -84,7 +89,7 @@ Cluster: The cluster it belongs to. Int vairable ranging from 1 to 10
 ```{r}
 ##' @param res: A list containing the resulting data from model
 ##' @return _table : data.frame with TT rows and 3 columns
-form_mn_table = function(res){
+form_mn_table <- function(res){
   dfs = lapply(1:numclust, function(iclust){
   one_table = tibble(diam_mid_pie = mn[,1,iclust],
                      chl_small_pie = mn[,1,iclust],
@@ -96,7 +101,7 @@ form_mn_table = function(res){
   mn_table = bind_rows(dfs)
   return(mn_table)
 }
-form_mn_table(res)
+mn_table = form_mn_table(res)
 ```
 
 Combine two dataframe
@@ -137,7 +142,7 @@ collapse_3d_to_2d <- function(y, counts, dims=1:2){
 
 ##' @param ylist: A list containing the resulting data from ylist in res
 ##' @param table_list: A list of table (dimension choose 2) data frames. The deafult ordering will be...(to be determined)
-convert_ylist_2d = function(ylist){
+convert_ylist_2d <- function(ylist){
   ## Setup
   alltimes = names(ylist)
   TT = length(ylist)
@@ -199,7 +204,6 @@ pie_plot
 ```
 
 ```{r}
-
 p1 <- plot_ly(as.data.frame(table_list[1]),
               x = ~diam_mid,
               y = ~chl_small,
@@ -274,3 +278,100 @@ scatterplot <- subplot(p1,p2,p3,shareX = TRUE,shareY = TRUE)
 scatterplot
 ```
 
+
+
+# Justin's suggestions
+
+First of all, the quality/readability of the code, and function
+definitions + documentation are all greatly improved! Good job on this.
+
+## Some lower-level to-do items 
+
+(**Please include these items in your update emails.**):
+
+* (High priority, within next few days) Make sure that you can load the
+  package. (Try pulling again from the master branch of flowmix; I've gotten rid
+  of the C++ code from the master branch.)
+
+* This Rmd file is not runnable (See my later comment about this)
+
+* When I make some small fixes and run it, your `p1` doesn't look like what we
+  want
+
+![](figures/p1.png)
+
+* (High priority, within next week) Recall I had pointed this out (attached
+  next), and we actually made a small toy example in which we could make the
+  **scatterplot vary over time**; did you get a chance to do something similar?
+
+> If you look at the code block called `animation1`, it seems that the
+>  background scatterplot points (not the cluster means) are not designed to move
+>  over time (I could be wrong -- let me know if I am). You only use the first
+>  500 columns of the large data frame. What happens when you use more rows, or
+>  all rows? Is this too slow, or prohibitive memory-wise? If so, doesn't that
+>  mean that this approach either needs to be improved or replaced?
+
+## Some higher level items:
+
+* I'd like you to maintain your helper functions in an R file, called `viz.R`,
+  in this repository (by the way, when we get to the point where we have too
+  many functions for a single file, we'll of course expand to several files; see
+  my next point). This way, we don't have the R functions scattered in the Rmd
+  files, which are not meant to be static locations for the function definitions
+  to reside.
+
+* Eventually, we'll want to add your files into an R package, named
+  "flowmix-viz", in the flowmix github repository. For a short blog post on how
+  to make your first R package, there are many resources out there, like [this
+  blog
+  post](https://tinyheero.github.io/jekyll/update/2015/07/26/making-your-first-R-package.html).
+  Let's cross this bridge when we come to it!
+
+* The advantage of having things in an R package is that when we are writing
+  scripts using our helper functions, we just need to run `library(flowmix-viz)`
+  or `load_all("C:/Users/Administrator/Desktop/flowmix-master/flowmix')` and all
+  the functions are encapsulated.
+
+
+## Some project organization items:
+
+* This Rmd file is not runnable. I've asked about this before, but could you
+  always double check whether the file renders *on its own* (i.e. the "knit"
+  button in Rstudio), and also upload an accompanying html output file? Recall
+  the same point made in `demo_8_27_with_suggestions.Rmd`:
+
+> This document is clearly not knittable. That's, in general, the whole point of
+> using R Markdown -- you have a single ".Rmd" file that you can knit to
+> **reproduce** your data analysis. I should be able to hit "knit"
+> (Ctrl+Shift+K) in my Rstudio and be able to produce a complete document; the
+> same one as yours. From hereon, when you share Rmd documents, could you make
+> sure that these are completely knittable.
+  
+* Also, see https://rmarkdown.rstudio.com/authoring_basics.html for how to make
+  cleaner Rmd files, with proper headers and subheaders and links, **bold
+  faced** and *italics*, quotes and `code`. You can also start by mimicking my
+  "learning-plotly.Rmd" style. 
+  
+* The cleanness and completeness of these Rmd files is **super important** since
+  this is the primary way we communicate -- especially we only meet 30 minutes a
+  week. If you just scroll up (screenshot attached next), you can see that the
+  document is not nearly at a finishing quality of even a homework
+  assignment. You should think of these R markdown documents as your periodic
+  job progress report -- surely if you were reporting to your boss, you would
+  want to have your report made in complete sentences and narrated coherently,
+  formatted consistently, and you would also want to polish the report so that
+  you can convey clearly what you've done. Your current document looks like
+  this:
+
+![](figures/demo-9-17-screenshot.png)
+
+
+* I realize some of my suggestions are slipping through the cracks. It's
+  important to keep track of detailed todo items, especially since ours is
+  largely a software implementation project.
+
+* Moving forward, can you write me a short weekly email before our meeting? This
+  email would contain:
+    + The summary (just a few sentences is fine) for what you've done so this week.
+    + Todo items that you've finished this week.
+    + Todo items that were (roughly in priority order, if applicable).
