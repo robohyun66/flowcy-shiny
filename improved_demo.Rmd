@@ -1,0 +1,276 @@
+---
+title: "demo_improved_9/17"
+author: "Henry He"
+date: "2020/9/17"
+output: html_document
+---
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.width=14, fig.height=8, echo=TRUE, eval=TRUE, cache=TRUE,
+                      warning=FALSE, message=FALSE)
+library(chron)
+library(devtools)
+library(dplyr)
+library(tidyr)
+library(data.table)
+library(ggplot2)
+library(gganimate)
+library(lubridate)
+library(plotly)
+library(abind)
+load_all('C:/Users/Administrator/Desktop/flowmix-master/flowmix') ## Replace with the location of on
+                                              ## your computer
+```
+
+- Load Data 
+The file res.RDS will be loaded into a `list` called `res`
+Entries of the list will then be extracted and seperately stored
+```{r}
+filedir = "C:/Users/Administrator/Documents/GitHub/flowcy-shiny/learning-plotly/res.RDS"
+res = readRDS(filedir)
+
+countslist = res$countslist
+
+ylist = res$ylist
+
+mn = res$mn
+
+numclust = res$numclust
+
+TT = length(ylist)
+
+Time <- names(ylist)
+
+```
+Read Data 
+
+function: form_pie_table
+
+The `pie` entry of `res` will be extracted, and stored in a new dataframe called pie_table. 
+
+Parameter: list `res` 
+Return : a number dependent on res data x 3 dataframe
+Pie table has three columns : 
+Time: Indicating the time associated with the row
+Cluster: Which cluster it belongs to
+Prob: The `pie` value extracted from the table
+
+```{r}
+##' @param res: A list containing the resulting data from model
+##' @return pie_table : data.frame with TT rows and 3 columns
+form_pie_table <- function(res){
+  pie_table <- data.frame(res$pie)
+  pie_table <- setDT(pie_table, keep.rownames = "Time")[]
+  colnames(pie_table) <- c("Time", paste0("cluster_", 1:10))
+## Reshape it to 3 columns as described above
+  pie_table <- pie_table%>%
+  gather(var,val,-c(1))%>%
+  separate(var,c("type","cluster"))%>%
+  .[-2]
+  colnames(pie_table) <- c("Time", "Cluster","Prob")
+  return(pie_table)
+}
+pie_table = form_pie_table(res)
+head(pie_table)
+```
+2. mn(cluster means)
+function : form_mn_table
+Extract `mn` values from 'res' and stored in a new dataframe called mn_table
+
+parameter : list `res`
+return : a 2960 x 5 dataframe
+diam_mid_pie,chl_small,pe_pie : This three columns contains the cluster means that associated with each of the three dimensions diam_mid,chl_small and pe.
+Time: time associated with this row
+Cluster: The cluster it belongs to. Int vairable ranging from 1 to 10
+```{r}
+##' @param res: A list containing the resulting data from model
+##' @return _table : data.frame with TT rows and 3 columns
+form_mn_table = function(res){
+  dfs = lapply(1:numclust, function(iclust){
+  one_table = tibble(diam_mid_pie = mn[,1,iclust],
+                     chl_small_pie = mn[,1,iclust],
+                     pe_pie = mn[,1,iclust],
+                     Time = Time, Cluster = rep(iclust, TT))
+  colnames(one_table)[1:3] <- c("diam_mid_pie","chl_small_pie","pe_pie")
+  one_table
+  })
+  mn_table = bind_rows(dfs)
+  return(mn_table)
+}
+form_mn_table(res)
+```
+
+Combine two dataframe
+Thoughts, two dataframe both contained column Cluster, and later our objective is to highlight date based on Cluster. It make sense to merge two dataframe into one insteading of keeping them seperately
+function
+Note : Time,Cluster columns in two dataframe are identical, we only keep one in our new table.
+```{r}
+clustered_data_table = merge(pie_table,mn_table)
+head(clustered_data_table)
+```
+
+In order to plot this three dimensional data, we will  store ylist 
+into three sub-dataframes each contains two of the three dimensions
+Function : convert_ylist_2d (better name)
+parameter: ylist 
+return : Three data_frames each containg two of the dimension of ylist 
+
+```{r}
+## Function from flowmix file
+collapse_3d_to_2d <- function(y, counts, dims=1:2){
+
+  ## Basic checks
+  stopifnot(all(dims %in% 1:3))
+  stopifnot(length(dims)==2)
+
+  ## Aggregate
+  ymat = cbind(y[,dims], counts) %>% as.data.frame()
+  names(ymat)[1:2] = c("dim1", "dim2")
+  ymat_summary <- ymat %>% group_by(dim1, dim2) %>% summarise(counts=sum(counts)) %>% as.matrix
+
+  ## Basic check
+  if(!is.null(colnames(y))){
+    colnames(ymat_summary)[1:2] = colnames(y)[dims]
+  }
+
+  return(ymat_summary)
+}
+
+##' @param ylist: A list containing the resulting data from ylist in res
+##' @param table_list: A list of table (dimension choose 2) data frames. The deafult ordering will be...(to be determined)
+convert_ylist_2d = function(ylist){
+  ## Setup
+  alltimes = names(ylist)
+  TT = length(ylist)
+  tablist = list()
+  dimslist = list(c(1,2), c(2,3), c(3,1))
+
+  ## Obtain all the tables once.
+  for(ii in 1:length(dimslist)){
+
+    dims = dimslist[[ii]]
+
+    ## Form the table
+    all_2d_tables = lapply(1:TT, function(tt){
+      y = ylist[[tt]][,dims]
+      counts = countslist[[tt]]
+      collapse_3d_to_2d(y, counts, dims=1:2)
+    })
+    combined_2d_table = do.call(rbind, all_2d_tables) %>% as_tibble()
+
+    ## Add time
+    reptimes = sapply(all_2d_tables, nrow)
+    times = rep(alltimes, reptimes)
+    combined_2d_table[,"Time"] = times
+    newname = paste0("counts_", ii)
+    combined_2d_table <- rename(combined_2d_table, !!newname:=counts)
+    tablist[[ii]] = combined_2d_table
+  }
+  diam_chl_table <- tablist[[1]]
+  pe_chl_table <- tablist[[2]]
+  diam_pe_table <- tablist[[3]] 
+  return(list(diam_chl_table,pe_chl_table,diam_pe_table))
+}
+table_list = convert_ylist_2d(ylist)
+```
+- Plot
+
+```{r}
+# Colors
+# how to choose color?
+# This is set of color is chosen by hand with numclust known to be 10. In general, this should be replaced by 
+# a set of colors with length = numclust whose element are chosen from ...(Need to set a range for color)
+myColor = c("red","green","orange","blue","brown","deeppink","navyblue","orchid","seagreen","gold")
+
+key <- highlight_key(clustered_data_table,~Cluster)
+
+# create highlight key, which highlights by cluster
+pie_plot <- plot_ly(key)%>%
+  group_by(Cluster)%>%
+  add_lines(x = ~Time , y = ~Prob, color = ~Cluster, colors = myColor ,)%>%
+  add_segments(x = ~Time, xend = ~Time, y = 0, yend = 1, frame = ~Time,showlegend = FALSE, color = "red",showlegend = FALSE)
+
+# modify the x-axis  
+pie_plot <- pie_plot%>%layout(
+  xaxis = list(
+    type = "date",
+    tickformat = "%d%M%Y",showticklabels = FALSE)
+)
+pie_plot
+```
+
+```{r}
+
+p1 <- plot_ly(as.data.frame(table_list[1]),
+              x = ~diam_mid,
+              y = ~chl_small,
+              size = ~ counts_1,
+              type = 'scatter',
+              mode = 'markers',
+              sizes = c(0,1000), 
+              opacity = 0.5,
+              alpha = 0.3,
+              showlegend = FALSE) %>%
+  add_trace(data = key,
+            x = ~diam_mid_pie,
+            y = ~chl_small_pie,
+            frame = ~Time,
+            size = 5,
+            hoverinfo = 'text',
+            text = ~paste("Cluster", Cluster),
+            hovertext = ~paste("Cluster", Cluster),
+            textposition = "bottom center",
+            mode = 'markers+text',
+            textfont = list(size = 14),
+            opacity = 0.9)
+p2 <- plot_ly(as.data.frame(table_list[2]),
+              x = ~pe,
+              y = ~chl_small,
+              size = ~ counts_2,
+              type = 'scatter',
+              mode = 'markers',
+              alpha = 0.3,
+              opacity=0.5,
+              sizes = c(0,1000),
+              showlegend = FALSE)%>%
+  add_trace(data = key,
+            x = ~pe_pie,
+            y = ~chl_small_pie,
+            frame = ~Time,
+            showlegend = FALSE, 
+            size = 5,
+            hoverinfo = 'text',
+            text = ~paste("Cluster",Cluster),
+            hovertext = ~paste("Cluster",Cluster),
+            textposition = "bottom center",
+            mode = 'markers+text',
+            textfont = list(size = 14),
+            opacity = 0.9
+            )
+
+p3<-plot_ly(as.data.frame(table_list[2]),
+            x= ~diam_mid,
+            y = ~pe,
+            size = ~ counts_3,
+            type = 'scatter',
+            mode = 'markers',
+            opacity=0.5, 
+            sizes = c(0,1000),
+            alpha = 0.3,
+            showlegend = FALSE)%>%
+  add_trace(data = key,
+            x = ~diam_mid_pie,
+            y = ~pe_pie,
+            frame = ~Time,
+            size = 5,
+            hoverinfo = 'text',
+            text = ~paste("Cluster",Cluster),
+            hovertext = ~paste("Cluster",Cluster),
+            textposition = "bottom center",
+            mode = 'markers+text',
+            textfont = list(size = 14),
+            opacity = 0.9
+            )
+scatterplot <- subplot(p1,p2,p3,shareX = TRUE,shareY = TRUE)
+scatterplot
+```
+
