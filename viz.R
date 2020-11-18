@@ -13,7 +13,6 @@ library(abind)
 load_all('C:/Users/Administrator/Desktop/flowmix-master/flowmix')
 
 
-
 ## contain helper functions needed in the process of loading,extracting and
 ## processing data
 
@@ -40,10 +39,11 @@ form_pie_table <- function(res){
 ##' @param res: A list containing the resulting data from model
 ##' @return _table : data.frame with TT rows and 3 columns
 form_mn_table = function(res){
+  res = reorder_clust(res)
   numclust = res$numclust
   TT = length(ylist)
   Time <- names(ylist)
-  
+  mn = res$mn
   dfs = lapply(1:numclust, function(iclust){
     one_table = tibble(diam_mid_pie = mn[,1,iclust],
                        chl_small_pie = mn[,2,iclust],
@@ -141,7 +141,7 @@ covariates_table = function(res){
 ##' @return plot: a plotly object of the 3+1 plots.
 default_view = function(res){
   # data tables 
-  pie_table = form_pie_table(res,numclust)
+  pie_table = form_pie_table(res)
   mn_table = form_mn_table(res)
   clustered_data_table = cbind(pie_table,mn_table)[c(-7,-8)]
   table_list = convert_ylist_2d(ylist)
@@ -163,7 +163,7 @@ default_view = function(res){
     xaxis = list(
       type = "date",
       tickformat = "%d%M%Y",showticklabels = FALSE,showgrid = FALSE),
-    yaxis = list(showgrid = FALSE),
+    yaxis = list(showgrid = FALSE,title = c("Cluster Probabilities"),titlefont = list(size = 8)),
     showlegend = FALSE,
     title = ""
   )
@@ -199,7 +199,7 @@ default_view = function(res){
               textposition = 'middle right',
               frame = ~Time,
               showlegend = FALSE,
-              size = ~Prob*500,
+              size = ~Prob*200,
               marker = list(
                 color = "red"
               ),
@@ -209,7 +209,7 @@ default_view = function(res){
               textfont = list(size = 14),
               opacity = 0.9,
               alpha = 1
-    )
+    )%>% layout(yaxis = list(showgrid = FALSE,title = c("chl_small"),titlefont = list(size = 8)), xaxis = list(showgrid = FALSE,title = c("diam_mid"),titlefont = list(size = 8)))
   p2 <- plot_ly(as.data.frame(table_list[2]),
                 y = ~pe,
                 x = ~chl_small,
@@ -232,7 +232,7 @@ default_view = function(res){
               textposition = 'middle right',
               frame = ~Time,
               showlegend = FALSE,
-              size = ~Prob*500,
+              size = ~Prob*200,
               hoverinfo = 'text',
               hovertext = ~paste("Cluster",Cluster),
               mode = 'markers',
@@ -242,7 +242,7 @@ default_view = function(res){
               marker = list(
                 color = "red"
               )
-    )
+    )%>%layout(yaxis = list(showgrid = FALSE,title = c("pe"),titlefont = list(size = 8)), xaxis = list(showgrid = FALSE,title = c("chl_small"),titlefont = list(size = 8)))
   
   p3<-plot_ly(as.data.frame(table_list[3]),
               y= ~diam_mid,
@@ -265,7 +265,7 @@ default_view = function(res){
               text = ~Cluster,
               textposition = 'middle right',
               frame = ~Time,
-              size = ~Prob*500,
+              size = ~Prob*200,
               hoverinfo = 'text',
               hovertext = ~paste("Cluster",Cluster),
               mode = 'markers',
@@ -273,15 +273,25 @@ default_view = function(res){
               opacity = 0.9,
               alpha = 1,
               marker = list(color = "red")
-    )
+    )%>%layout(yaxis = list(showgrid = FALSE,title = c("diam_mid"),titlefont = list(size = 8)), xaxis = list(showgrid = FALSE,title = c("pe"),titlefont = list(size = 8)))
   scatterplot <- subplot(p1,p2,p3,titleX = TRUE,titleY = TRUE)%>%animation_opts(
     frame = 5,transition = 0, easing = "elastic", redraw = FALSE,mode = "immediate"
   )
   
 # covariates plot 
-  cv_plot <- plot_ly(key)%>%
+  
+  # covariates table 
+  covariates = res$X
+  covariates = as.data.frame(covariates)
+  covariates = setDT(covariates, keep.rownames = "Time")[]
+  covariates <- covariates%>%
+    gather(var,val,-c(1))
+  colnames(covariates) = c("Time","Trace","Value")
+  # plot 
+  
+  cv_plot <- plot_ly(covariates)%>%
     group_by(Trace)%>%
-    add_lines(x = ~Time , y = ~Value,color = "grey84")%>%
+    add_lines(x = ~Time , y = ~Value,color = "grey50",opacity = 0.1)%>%
     add_segments(x = ~Time, xend = ~Time, y = -6, yend = 6, frame = ~Time,showlegend = FALSE, color = myColor[1],showlegend = FALSE)
   
   # modify the x-axis  
@@ -289,22 +299,60 @@ default_view = function(res){
     xaxis = list(
       type = "date",
       tickformat = "%d%M%Y",showticklabels = FALSE,showgrid = FALSE),
-    yaxis = list(showgrid = FALSE),
-    showlegend = FALSE,
-    title = "Covariates"
+    yaxis = list(showgrid = FALSE, title = c("EnvironmenTal Covariates"),titlefont = list(size = 8)),
+    showlegend = FALSE
   )
-  cv_plot%>%highlight(
-    on = "plotly_click", 
-    off = "plotly_doubleclick",
-    selectize = FALSE, 
-    dynamic = FALSE, 
-    persistent = FALSE,
-    showlegend = F
-  )
+  #cv_plot%>%highlight(
+   # on = "plotly_click", 
+  #  off = "plotly_doubleclick",
+  #  selectize = FALSE, 
+  #  dynamic = FALSE, 
+  #  persistent = FALSE,
+  #  showlegend = F
+  #)
   # combine plots
-plot <- subplot(scatterplot,cv_plot,pie_plot,nrows = 3,margin = 0.05, shareX = FALSE)%>%animation_opts(
+plot <- subplot(scatterplot,cv_plot,pie_plot,nrows = 3,margin = 0.05, shareX = FALSE,titleY = TRUE,titleX = TRUE)%>%animation_opts(
     frame = 5,transition = 0, easing = "elastic", redraw = FALSE,mode = "immediate"
   )
   return(plot)
   
 }
+
+reorder_clust= function(res){
+  
+  ## Create an order
+  
+  ## Here's a suggestion for the 1d plots... since the coloring (and
+  ## likewise numbering) of the clusters is arbitrary, what if we come up
+  ## with some standard rule for labeling/coloring.  For example, it could
+  ## simply be from largest diameter (averaged across all time) to smallest
+  ## diameter.  Another natural choice for the ordering would be to order
+  ## them from largest to smallest pi values (again averaged over all time).
+  ## This way, your 1d-all-models.pdf will have (for the most part)
+  ## consistent coloring/labeling in all the tiny plots.  Actually, the
+  ## "largest pi" approach would work for the 3d plots as well.
+  
+  ## ord = res$prob %>% colSums %>% order(decreasing=TRUE)
+  ## ord = res$mn %>% colSums %>% order(decreasing=TRUE)
+  ord = res$mn[,1,] %>% colSums() %>% order(decreasing=TRUE)
+  
+  ## Reorder mean
+  res$mn = res$mn[,,ord, drop=FALSE]
+  
+  ## Reorder sigma
+  res$sigma = res$sigma[ord,,,drop=FALSE]
+  
+  ## Reorder prob
+  res$prob = res$prob[,ord, drop=FALSE]
+  
+  ## Reorder the alpha coefficients
+  res$alpha = res$alpha[ord,, drop=FALSE] ## Also rename the row names
+  rownames(res$alpha) = paste0("clust-", 1:res$numclust)
+  
+  ## Reorder the beta coefficients
+  res$beta = res$beta[ord]
+  names(res$beta) = paste0("clust-", 1:res$numclust)
+  
+  return(res)
+}
+
