@@ -58,6 +58,7 @@ covariates_table = function(res){
   covariates <- covariates%>%
     gather(var,val,-c(1))
   colnames(covariates) = c("Time","Trace","Value")
+  covariates$Time = lubridate::as_date(covariates$Time)
   return(covariates)
 }
 
@@ -82,7 +83,7 @@ cv_plot
 ui <- fluidPage(
     fluidRow(
         column(6,
-               plotlyOutput(outputId = "p")
+               plotlyOutput(outputId = "row_selected")
         ),
         column(4,
                div(DT::dataTableOutput("table"), style = "font-size:60%; width: 10%")
@@ -90,7 +91,7 @@ ui <- fluidPage(
     ),
     fluidRow(
         column(6,
-               plotlyOutput("row_selected") 
+               plotlyOutput("p") 
                ),
         column(4,
                verbatimTextOutput("event")
@@ -100,20 +101,6 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
-    output$p <- renderPlotly({
-      # A plotly object 
-        pie_plot
-      #  s = input$table_rows_selected
-      #  if(is.null(s)) s = dim(res$X)[2]
-      #  covariates = res$X[,s]
-      #  covariates = as.data.frame(covariates)
-      #  covariates = setDT(covariates, keep.rownames = "Time")[]
-      #  covariates <- covariates%>%
-      #      gather(var,val,-c(1))
-      #  colnames(covariates) = c("Time","Trace","Value")
-      #  cv_plot = cv_plot%>%add_data(covariates)%>%group_by(Trace)%>%add_lines(x = ~Time , y = ~Value,mode = "lines")
-      #  subplot(pie_plot,cv_plot,nrows = 2,shareX = TRUE)
-    })
     output$event <- renderPrint({
       # get click information
         d <- event_data("plotly_click")
@@ -130,32 +117,33 @@ server <- function(input, output, session) {
         selected = event_data("plotly_click")
         if(!is.null(selected)){
             cluster_num = as.numeric(selected$key)
-            alpha = t(as.data.frame(res$alpha)[cluster_num,])
+            alpha = t(round(as.data.frame(res$alpha)[cluster_num,],2))
             beta_index_first = (cluster_num-1)*3 + 1
             beta_index_second = beta_index_first + 2
             if(beta_index_first != 0){
-                beta = as.data.frame(res$beta)[,beta_index_first:beta_index_second]
+                beta = round(as.data.frame(res$beta)[,beta_index_first:beta_index_second],2)
             }
             cbind(alpha,beta)
         }
     })
     output$row_selected <- renderPlotly({
-        s = input$table_rows_selected
-        if(is.null(s)){
-            s = dim(res$X)[2]
-            cv_plot
-        }else{
-            covariates = res$X[,s]
-            covariates = as.data.frame(covariates)
-            covariates = setDT(covariates, keep.rownames = "Time")[]
-            covariates <- covariates%>%
-                gather(var,val,-c(1))
-            colnames(covariates) = c("Time","Trace","Value")
-            cv_plot = cv_plot%>%add_data(covariates)%>%group_by(Trace)%>%add_lines(x = ~Time , y = ~Value,mode = "lines")
-            cv_plot
-        }
+       subplot(cv_plot,pie_plot,nrows = 2)
     })
     
+    observeEvent(input$table_rows_selected, {
+      s = input$table_rows_selected
+      covariates = res$X[,s]
+      covariates = as.data.frame(covariates)
+      covariates = setDT(covariates, keep.rownames = "Time")[]
+      covariates <- covariates%>%
+        gather(var,val,-c(1))
+      colnames(covariates) = c("Time","Trace","Value")
+      plotlyProxy("row_selected",session)%>%
+        plotlyProxyInvoke("addTraces",list(x = covariates$Time,y = covariates$Value, colors = "red")
+          
+        )
+      
+    })
     
 }
 
