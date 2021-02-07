@@ -1,0 +1,201 @@
+---
+title: "Shiny app demo"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width = 7, fig.height = 7, echo = TRUE, warning = FALSE,
+                      message = FALSE, eval = TRUE, cache = FALSE)
+```
+
+# Setup
+
+Load libraries.
+
+```{r}
+library(shiny)
+library(plotly)
+library(dplyr)
+library(plotly)
+library(chron) ## SH: why do we need this? If we don't, delte it.
+library(devtools)
+library(tidyr)
+library(data.table)
+library(ggplot2)
+library(gganimate)
+library(randomcoloR)
+source("viz.R")
+```
+
+# Notes from Justin
+
+(You can erase each item after it has been taken care of.)
+
+- Your app should be a much simpler call to the shiny. The call to the app
+  should be `viz.flowmix()`.
+
+- Your code is not organized enough. Your code should all be functions that are
+  documented to completion, with `@param` and `@return` tags, as well as a
+  description of what the function does.
+
+- Your code shouldn't rely on external calls to `make_prob_table()` or
+  `make_prob_plot` or `make_covariates_table()` or
+  `make_covariates_plot()`. This should all be contained in `viz.flowmix()`.
+
+- Your app doesn't work. `covariates_plot` doesn't show me anything. Anything
+  after that doesn't work either.
+
+- `convert_ylist_2d()` depends on `collapse_3d_to_2d()` function. You don't
+     have this function in the github package. It seems to exist in
+     `demo-wip/improved_demo.Rmd` but seeing that.
+
+- `convert_ylist_2d()` is too specific for our data. It assumes that the three
+     dimensions of data are named diam, pe and chl; it has variables called
+     `diam_chl_table` `pe_chl_table` and `diam_pe_table`.
+
+- Moving forward, your code should not assume that any of the data has any
+  specific column names. It is *general* data; for `T` time points in total,
+  `ylist` is a list of $n_t$ by $d$ matrices, where $n_t$ is the number of data
+  points at time $t$. The $p$ covariates are a single matrix of dimension $T
+  \times p$.
+
+- You should clean the github repository, and keep it clean from now on. All of
+  your functions are in `viz.R`. Right now, you have `app.R` and `v0.Rmd` and
+  `shiny-app-demo.R`, as well as several folders. I'm going to clean it once, so
+  that there are only two demo files:
+  + `shiny-app-demo.Rmd`, which contains the latest code.
+  + `plotly-demo.Rmd`, which contains the latest code for the demo *before* we
+    started using Shiny; this is the code Jacob and I saw when you present last
+    time.
+
+- I'm continuously mentioning this, but it's important to make sure your demo
+  files are error-free. What I mean by error-free is this: in an R file, you
+  make sure that I can open up R, and run the code from beginning to end, and
+  produce the same output or app as you, with no bugs or errors. (I've never
+  seen an error-free demo script from you yet). Likewise for an Rmd file; I
+  think your workflow is to just run the code within an Rmd file, but that often
+  results in errors in the code. An rmd file being error-free means that you're
+  able to knit the file (Ctrl-Shift-K). If you don't make the scripts
+  error-free, there is nothing I can help with (I spent quite a few hours today
+  just cleaning your code, just to realize that the code doesn't work.)
+
+- For the two Rmd files, you should knit to produce the html files, and push
+  them to github. Just to be clear, you should always have the latest version of
+  `plotly-demo.Rmd` and `plotly-demo.html`.
+
+- I've tried to clean the functions `viz.R`, but haven't been able to finish.
+  + Everything in this file should be function definitions. No calls to R
+    libraries or loading data files.
+  + Whenever a function is called, it should either be defined within the same
+    file, or you should prepend the function call with a tag like
+    `packagename::`. For instance, if you call `collapse_3d_to_2d()` from the
+    flowmix R package, you should write `flowmix::collapse_3d_to_2d()`.
+  + You should look at all the comments that start with "SH:", and address them.
+  
+
+# Main code
+
+Load data.
+
+```{r}
+## filedir = "C:/Users/heqin/OneDrive/Desktop/for-henry (2)/res.RDS"
+datadir = "~/repos/flowmix-shiny"
+res = readRDS(file = file.path(datadir, "res.RDS"))
+res$prob = res$pie
+```
+
+Make cluster probability plotly object.
+
+```{r}
+prob_table = res %>% make_prob_table()
+prob_plot <- prob_table %>% make_prob_plot()
+```
+
+Make covariates plotly object:
+```{r, eval=FALSE}
+covariates <- res %>% make_covariates_table()
+covariates_plot <- covariates %>% make_covariates_plot()
+covariates_plot
+```
+
+SH: I realized this doesn't work. So the remaining code doesn't work
+either. I've set `eval=FALSE`.
+ 
+
+```{r, eval=FALSE}
+ui <- fluidPage(
+    fluidRow(
+        column(6,
+               plotlyOutput(outputId = "row_selected")),
+        column(4,
+               div(DT::dataTableOutput("table"), style = "font-size:60%; width: 10%"))      
+    ),
+    fluidRow(
+        column(6,
+               plotlyOutput("p") 
+               ),
+        column(4,
+               verbatimTextOutput("event")
+        )
+        
+    )
+)
+
+server <- function(input, output, session) {
+    output$event <- renderPrint({
+      # get click information
+        d <- event_data("plotly_click")
+        if(is.null(d))
+            "The selected cluster number is Here"
+        else{
+            d$key
+        }
+        
+    })
+    output$table = DT::renderDataTable({
+        beta_index_first = 0
+        beta_index_second = 0
+        selected = event_data("plotly_click")
+        if(!is.null(selected)){
+            cluster_num = as.numeric(selected$key)
+            alpha = t(round(as.data.frame(res$alpha)[cluster_num,],2))
+            beta_index_first = (cluster_num-1)*3 + 1
+            beta_index_second = beta_index_first + 2
+            if(beta_index_first != 0){
+                beta = round(as.data.frame(res$beta)[,beta_index_first:beta_index_second],2)
+            }
+            cbind(alpha,beta)
+        }
+    })
+    output$row_selected <- renderPlotly({
+       subplot(cv_plot,pie_plot,nrows = 2)
+    })
+    
+    observeEvent(input$table_rows_selected, {
+      s = input$table_rows_selected
+      covariates = res$X[,s]
+      covariates = as.data.frame(covariates)
+      covariates = setDT(covariates, keep.rownames = "Time")[]
+      covariates <- covariates%>%
+        gather(var,val,-c(1))
+      colnames(covariates) = c("Time","Trace","Value")
+      plotlyProxy("row_selected",session)%>%
+        plotlyProxyInvoke("addTraces",list(x = covariates$Time,y = covariates$Value, colors = "red")
+          
+        )
+      
+    })
+    
+}
+```
+
+Run the shiny app.
+
+```[r, eval=FALSE}
+# Run the application
+shinyApp(ui = ui, server = server)
+```
