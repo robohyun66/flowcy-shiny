@@ -97,6 +97,15 @@ source("viz.R")
   + You should look at all the comments that start with "SH:", and address them.
   
 
+- This is a good time for you to take a look at the flowmix R package here, to
+  familarize yourself with the data and model:
+  https://github.com/sangwon-hyun/flowmix
+  + In particular, you should try running the demo file:
+    https://github.com/sangwon-hyun/flowmix/blob/master/demo.Rmd
+  + The example output is here:
+  + https://htmlpreview.github.io/?https://github.com/sangwon-hyun/flowmix/blob/master/demo.html
+
+
 # Main code
 
 Load data.
