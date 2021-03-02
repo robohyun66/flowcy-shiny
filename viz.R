@@ -1,8 +1,8 @@
 ## contain helper functions needed in the process of loading,extracting and
 ## processing data
 
-
-
+# List of color. It is initialized outside of function defintion to ensure that functions share same set of colors
+myColor <- randomcoloR::distinctColorPalette(k = (res$numclust) + 1)
 ## SH: Fill in.
 
 ##' @param res Flowmix object.
@@ -315,9 +315,13 @@ make_covariates_table <- function(res){
   covariates <- covariates %>%
     gather(var,val,-c(1))
   colnames(covariates) = c("Time","Trace","Value")
-  covariates$Time = lubridate::as_date(covariates$Time)
+  # Removed for now
+ # covariates$Time = lubridate::as_date(covariates$Time)
   return(covariates)
 }
+
+
+
 
 
 ##' From the output of \code{covariates_table()}, create a plotly object.

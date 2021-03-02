@@ -21,7 +21,6 @@ library(shiny)
 library(plotly)
 library(dplyr)
 library(plotly)
-library(chron) ## SH: why do we need this? If we don't, delte it.
 library(devtools)
 library(tidyr)
 library(data.table)
@@ -111,9 +110,8 @@ source("viz.R")
 Load data.
 
 ```{r}
-## filedir = "C:/Users/heqin/OneDrive/Desktop/for-henry (2)/res.RDS"
-datadir = "~/repos/flowmix-shiny"
-res = readRDS(file = file.path(datadir, "res.RDS"))
+filedir = "C:/Users/heqin/OneDrive/Desktop/for-henry (2)/res.RDS"
+res = readRDS(filedir)
 res$prob = res$pie
 ```
 
@@ -122,7 +120,9 @@ Make cluster probability plotly object.
 ```{r}
 prob_table = res %>% make_prob_table()
 prob_plot <- prob_table %>% make_prob_plot()
+prob_plot
 ```
+
 
 Make covariates plotly object:
 ```{r, eval=FALSE}
@@ -133,7 +133,7 @@ covariates_plot
 
 SH: I realized this doesn't work. So the remaining code doesn't work
 either. I've set `eval=FALSE`.
- 
+- Now, The covariates plot is created.
 
 ```{r, eval=FALSE}
 ui <- fluidPage(
@@ -181,7 +181,7 @@ server <- function(input, output, session) {
         }
     })
     output$row_selected <- renderPlotly({
-       subplot(cv_plot,pie_plot,nrows = 2)
+       subplot(covariates_plot,prob_plot,nrows = 2)
     })
     
     observeEvent(input$table_rows_selected, {
@@ -193,7 +193,7 @@ server <- function(input, output, session) {
         gather(var,val,-c(1))
       colnames(covariates) = c("Time","Trace","Value")
       plotlyProxy("row_selected",session)%>%
-        plotlyProxyInvoke("addTraces",list(x = covariates$Time,y = covariates$Value, colors = "red")
+        plotlyProxyInvoke("addTraces",list(x = covariates$Time,y = covariates$Value, line = list(color = 'red'))
           
         )
       
@@ -203,8 +203,11 @@ server <- function(input, output, session) {
 ```
 
 Run the shiny app.
+```{r echo = false}
+shinyApp(ui = ui,server = server)
+```
 
-```[r, eval=FALSE}
+```[r}
 # Run the application
 shinyApp(ui = ui, server = server)
 ```
