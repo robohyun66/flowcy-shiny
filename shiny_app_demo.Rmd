@@ -36,6 +36,8 @@ source("viz.R")
 
 - Your app should be a much simpler call to the shiny. The call to the app
   should be `viz.flowmix()`.
+  
+  I thought we are hosting this app on server so that it can be visited through URL.
 
 - Your code is not organized enough. Your code should all be functions that are
   documented to completion, with `@param` and `@return` tags, as well as a
@@ -51,10 +53,55 @@ source("viz.R")
 - `convert_ylist_2d()` depends on `collapse_3d_to_2d()` function. You don't
      have this function in the github package. It seems to exist in
      `demo-wip/improved_demo.Rmd` but seeing that.
+     
+    collapse_3d_to_2d() is a function from flowmix. This should be indicated in the code as pointed out by Justin.
 
 - `convert_ylist_2d()` is too specific for our data. It assumes that the three
      dimensions of data are named diam, pe and chl; it has variables called
      `diam_chl_table` `pe_chl_table` and `diam_pe_table`.
+   In the verison I pulled from repo, it seems that this issue is already fixed. 
+```{r}
+convert_ylist_2d <- function(ylist, countslist=NULL){
+
+  ## Setup
+  stopifnot(ncol(ylist[[1]]) == 3)
+  TT = length(ylist)
+  alltimes = names(ylist)
+  if(is.null(alltimes)) alltimes = 1:TT
+  tablist = list()
+  dimslist = list(c(1,2), c(2,3), c(3,1))
+  if(!is.null(countslist)) countslist = lapply(ylist, function(y) rep(1, nrow(y)))
+
+  ## Obtain all the tables once.
+  for(ii in 1:length(dimslist)){
+
+    dims = dimslist[[ii]]
+
+    ## Form the table
+    all_2d_tables = lapply(1:TT, function(tt){
+      y = ylist[[tt]]##[,dims]
+      counts = countslist[[tt]]
+      ## flowmix::collapse_3d_to_2d(y, counts, dims=dims)
+      collapse_3d_to_2d(y, counts, dims=dims)
+    })
+    combined_2d_table = do.call(rbind, all_2d_tables) %>% as_tibble()
+
+    ## Add time
+    reptimes = sapply(all_2d_tables, nrow)
+    times = rep(alltimes, reptimes)
+    combined_2d_table[,"time"] = times
+    newname = paste0("counts_", paste0(dims, collapse=""))
+    combined_2d_table <- rename(combined_2d_table, !!newname:=counts)
+    tablist[[ii]] = combined_2d_table
+  }
+  ## diam_chl_table <- tablist[[1]]
+  ## pe_chl_table <- tablist[[2]]
+  ## diam_pe_table <- tablist[[3]]
+  ## return(list(diam_chl_table,pe_chl_table,diam_pe_table))
+  return(tablist)
+}
+```
+
 
 - Moving forward, your code should not assume that any of the data has any
   specific column names. It is *general* data; for `T` time points in total,
@@ -110,7 +157,7 @@ source("viz.R")
 Load data.
 
 ```{r}
-filedir = "C:/Users/heqin/OneDrive/Desktop/for-henry (2)/res.RDS"
+filedir = "C:/Users/heqin/OneDrive/Documents/viz/data/res.RDS"
 res = readRDS(filedir)
 res$prob = res$pie
 ```
@@ -166,12 +213,14 @@ server <- function(input, output, session) {
         
     })
     output$table = DT::renderDataTable({
+      # This index indicating the range of columns to be displayed, which corresponding to the cluster number. 
         beta_index_first = 0
         beta_index_second = 0
         selected = event_data("plotly_click")
         if(!is.null(selected)){
             cluster_num = as.numeric(selected$key)
             alpha = t(round(as.data.frame(res$alpha)[cluster_num,],2))
+            # Calculate the index based on the dimenision of table
             beta_index_first = (cluster_num-1)*3 + 1
             beta_index_second = beta_index_first + 2
             if(beta_index_first != 0){
@@ -185,13 +234,16 @@ server <- function(input, output, session) {
     })
     
     observeEvent(input$table_rows_selected, {
+      # get user input
       s = input$table_rows_selected
+      # extract the corresponding data from res$X
       covariates = res$X[,s]
       covariates = as.data.frame(covariates)
       covariates = setDT(covariates, keep.rownames = "Time")[]
       covariates <- covariates%>%
         gather(var,val,-c(1))
       colnames(covariates) = c("Time","Trace","Value")
+      # Partial updates the graph to 'highlight' the trace.
       plotlyProxy("row_selected",session)%>%
         plotlyProxyInvoke("addTraces",list(x = covariates$Time,y = covariates$Value, line = list(color = 'red'))
           

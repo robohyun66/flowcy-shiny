@@ -1,0 +1,12 @@
+name: Visualization
+title: Visualization
+username:
+account: henry-he-usc
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3721448
+bundleId: 4290536
+url: https://henry-he-usc.shinyapps.io/Visualization/
+when: 1614693967.33197
+asMultiple: FALSE
+asStatic: FALSE
