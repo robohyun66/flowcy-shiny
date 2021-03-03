@@ -27,7 +27,7 @@ library(data.table)
 library(ggplot2)
 library(gganimate)
 library(randomcoloR)
-source("viz.R")
+source("viz_function.R")
 ```
 
 # Notes from Justin
@@ -167,7 +167,7 @@ Make cluster probability plotly object.
 ```{r}
 prob_table = res %>% make_prob_table()
 prob_plot <- prob_table %>% make_prob_plot()
-prob_plot
+
 ```
 
 
@@ -255,8 +255,9 @@ server <- function(input, output, session) {
 ```
 
 Run the shiny app.
-```{r echo = false}
-shinyApp(ui = ui,server = server)
+```{r}
+#shinyApp(ui = ui,server = server)
+viz_flowmix(res)
 ```
 
 ```[r}

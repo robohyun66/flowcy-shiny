@@ -1,14 +1,14 @@
+library(shiny)
 ## contain helper functions needed in the process of loading,extracting and
 ## processing data
 
 # List of color. It is initialized outside of function defintion to ensure that functions share same set of colors
 myColor <- randomcoloR::distinctColorPalette(k = (res$numclust) + 1)
-## SH: Fill in.
 
 ##' @param res Flowmix object.
-##'
+##' This is the data from runing the model
 ##' @return plot: a plotly object of the 3+1 plots.
-##'
+##' This generates the 3 scatterplots with probabilities/covariates plots
 default_view <- function(res){
 
   ## For back-compatability.
@@ -253,12 +253,13 @@ reorder_clust <- function(res){
 
 
 ##' Reshape cluster probability table to long format.
-##'
+##' This is the data from runing the model
 ##' @param res Flowmix object.
-##'
+##' Combine the original data into a longer matrix whose 'cluster' column 
+##' indicating the cluster each point belongs to
 ##' @return Long format matrix.
 make_prob_table <- function(res){
-  prob = res$prob
+  prob = res$pie
   numclust = ncol(prob)
   prob_table <- data.frame(prob)
   prob_table <- setDT(prob_table, keep.rownames = "Time")[]
@@ -275,9 +276,9 @@ make_prob_table <- function(res){
 
 ##' Makes plotly object from a long format table of cluster probabilities,
 ##' created using \code{make_prob_table()}.
-##'
+##'  Probability table as generated above
 ##' @param prob_table Prob table.
-##'
+##' The animation of probabilities of clusters over time
 ##' @return A plotly object
 make_prob_plot <- function(prob_table){
   numclust = prob_table %>% ncol()
@@ -297,15 +298,16 @@ make_prob_plot <- function(prob_table){
               dynamic = FALSE,
               persistent = FALSE,
               showlegend = F)
+    return(prob_plot)
 }
 
 
 
 
 ##' Make n x p covariates table into long format.
-##'
+##'This is the data from runing the model
 ##' @param res: A list containing the resulting data from model
-##'
+##' The covariates from res list
 ##' @return Data frame with np rows, and three columns -- time, covariate name
 ##'   and value. The three columns are named "Time", "Trace", and "Value".
 make_covariates_table <- function(res){
@@ -325,9 +327,9 @@ make_covariates_table <- function(res){
 
 
 ##' From the output of \code{covariates_table()}, create a plotly object.
-##'
+##' Data table of covariates as generated above
 ##' @param covariates Long format of covariates table.
-##'
+##' An animation of covariates over time
 ##' @return A plotly object.
 make_covariates_plot <- function(covariates){
   covariates %>%
@@ -345,14 +347,15 @@ make_covariates_plot <- function(covariates){
 
 
 
-##' SH: fill this in.
-##'
+
+##' This is the data from runing the model
 ##' @param res Flowmix object.
-##'
-##' @return Data frame with TT rows and 3 columns. SH: this is inaccurate.
+##' Dataframe of means of each clusters in the corresponding dimension.
+##' @return Data frame with TT rows and 5 columns.
 make_mn_table <- function(res){
   res = reorder_clust(res)
   numclust = res$numclust
+  ylist = res$ylist
   TT = length(ylist)
   Time <- names(ylist)
   mn = res$mn
@@ -410,8 +413,99 @@ convert_ylist_2d <- function(ylist){
     combined_2d_table <- rename(combined_2d_table, !!newname:=counts)
     tablist[[ii]] = combined_2d_table
   }
-  diam_chl_table <- tablist[[1]]
-  pe_chl_table <- tablist[[2]]
-  diam_pe_table <- tablist[[3]]
-  return(list(diam_chl_table,pe_chl_table,diam_pe_table))
+  #diam_chl_table <- tablist[[1]]
+  #pe_chl_table <- tablist[[2]]
+  #diam_pe_table <- tablist[[3]]
+  return(list(tablist[[1]],tablist[[2]],tablist[[3]]))
 }
+
+
+
+
+##'Create shiny that supports the interactivity between graph and table, which matches the website(currently on  https://henry-he-usc.shinyapps.io/Flowmix/)
+##'
+##' @param ylist: A list containing the resulting data from ylist in res
+##' @return app: A Shiny that enables the interactivity between animation and tables.
+viz_flowmix <- function(res){
+  numclust = res$numclust
+  # make prob_table
+  prob_table = res %>% make_prob_table()
+  prob_plot <- prob_table %>% make_prob_plot()
+  # make cov_table
+  covariates <- res %>% make_covariates_table()
+  covariates_plot <- covariates %>% make_covariates_plot()
+  
+  # shiny app 
+  ui <- fluidPage(
+    fluidRow(
+      column(6,
+             plotlyOutput(outputId = "row_selected")),
+      column(4,
+             div(DT::dataTableOutput("table"), style = "font-size:60%; width: 10%"))      
+    ),
+    fluidRow(
+      column(6,
+             plotlyOutput("p") 
+      ),
+      column(4,
+             verbatimTextOutput("event")
+      )
+      
+    )
+  )
+  
+  server <- function(input, output, session) {
+    output$event <- renderPrint({
+      # get click information
+      d <- event_data("plotly_click")
+      if(is.null(d))
+        "The selected cluster number is Here"
+      else{
+        d$key
+      }
+      
+    })
+    output$table = DT::renderDataTable({
+      # This index indicating the range of columns to be displayed, which corresponding to the cluster number. 
+      beta_index_first = 0
+      beta_index_second = 0
+      selected = event_data("plotly_click")
+      if(!is.null(selected)){
+        cluster_num = as.numeric(selected$key)
+        alpha = t(round(as.data.frame(res$alpha)[cluster_num,],2))
+        # Calculate the index based on the dimenision of table
+        beta_index_first = (cluster_num-1)*3 + 1
+        beta_index_second = beta_index_first + 2
+        if(beta_index_first != 0){
+          beta = round(as.data.frame(res$beta)[,beta_index_first:beta_index_second],2)
+        }
+        cbind(alpha,beta)
+      }
+    })
+    output$row_selected <- renderPlotly({
+      subplot(covariates_plot,prob_plot,nrows = 2)
+    })
+    
+    observeEvent(input$table_rows_selected, {
+      # get user input
+      s = input$table_rows_selected
+      # extract the corresponding data from res$X
+      covariates = res$X[,s]
+      covariates = as.data.frame(covariates)
+      covariates = setDT(covariates, keep.rownames = "Time")[]
+      covariates <- covariates%>%
+        gather(var,val,-c(1))
+      colnames(covariates) = c("Time","Trace","Value")
+      # Partial updates the graph to 'highlight' the trace.
+      plotlyProxy("row_selected",session)%>%
+        plotlyProxyInvoke("addTraces",list(x = covariates$Time,y = covariates$Value, line = list(color = 'red'))
+                          
+        )
+      
+    })
+    
+  }
+  app = shinyApp(ui = ui,server = server)
+  return(app)
+}
+
